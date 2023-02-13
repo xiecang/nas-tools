@@ -2400,6 +2400,8 @@ class WebAction:
                                                    sort=sort,
                                                    tags=tags,
                                                    page=CurrentPage)
+        elif Type == "DOUBANWISH":
+            res_list = self.get_douban_wish(CurrentPage)
 
         # 补充存在与订阅状态
         filetransfer = FileTransfer()
@@ -4306,6 +4308,25 @@ class WebAction:
         """
         results = self.dbhelper.get_douban_history()
         return {"code": 0, "result": [item.as_dict() for item in results]}
+
+    def get_douban_wish(self, page=1):
+        """
+        查询豆瓣同步历史
+        """
+        ret_infos = []
+        results = self.dbhelper.get_douban_history(page=page)
+        for result in results:
+            ret_infos.append({
+                "id": "DB:%s" % result.ID,
+                "orgid": result.ID,
+                'title': result.NAME,
+                'type': 'MOV' if result.TYPE == MediaType.MOVIE.value else 'TV',
+                'media_type': result.TYPE,
+                'year': result.YEAR,
+                'vote': result.RATING,
+                'image': result.IMAGE,
+            })
+        return ret_infos
 
     def __delete_douban_history(self, data):
         """

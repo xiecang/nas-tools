@@ -146,6 +146,7 @@ class DOUBANMEDIAS(Base):
     IMAGE = Column(Text)
     STATE = Column(Text)
     ADD_TIME = Column(Text)
+    MARK_DATE = Column(Text)
 
     def as_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}

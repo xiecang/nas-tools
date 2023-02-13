@@ -451,6 +451,18 @@ def douban_tv():
                            Filter="douban_tv",
                            FilterConf=ModuleConf.DISCOVER_FILTER_CONF.get('douban_tv'))
 
+# 豆瓣想看
+
+
+@App.route('/douban_wish', methods=['POST', 'GET'])
+@login_required
+def douban_wish():
+    return render_template("discovery/recommend.html",
+                           Type="DOUBANWISH",
+                           Title="豆瓣想看",
+                           Filter="douban_wish",
+                           FilterConf=ModuleConf.DISCOVER_FILTER_CONF.get('douban_wish'))
+
 
 @App.route('/tmdb_movie', methods=['POST', 'GET'])
 @login_required
