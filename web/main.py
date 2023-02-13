@@ -51,7 +51,7 @@ ConfigLock = Lock()
 # Flask App
 App = Flask(__name__)
 App.config['JSON_AS_ASCII'] = False
-App.secret_key = os.urandom(24)
+App.secret_key = 'qVCpD3nhxl'
 App.permanent_session_lifetime = datetime.timedelta(days=30)
 
 # 启用压缩
