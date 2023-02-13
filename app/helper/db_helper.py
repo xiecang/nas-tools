@@ -287,7 +287,7 @@ class DbHelper:
 
     def is_transfer_history_exists_by_source_full_path(self, source_full_path):
         """
-        据源文件的全路径查询识别转移记录
+        据源文件的全路径查询识别转移记录是否存在
         """
 
         path = os.path.dirname(source_full_path)
@@ -298,6 +298,16 @@ class DbHelper:
             return True
         else:
             return False
+
+    def get_transfer_history_exists_by_source_full_path(self, source_full_path):
+        """
+        据源文件的全路径查询识别转移记录
+        """
+
+        path = os.path.dirname(source_full_path)
+        filename = os.path.basename(source_full_path)
+        return self._db.query(TRANSFERHISTORY).filter(TRANSFERHISTORY.SOURCE_PATH == path,
+                                                      TRANSFERHISTORY.SOURCE_FILENAME == filename).all()
 
     @DbPersist(_db)
     def delete_transfer_log_by_id(self, logid):
@@ -1254,7 +1264,7 @@ class DbHelper:
         for site_user_info in site_user_infos:
             site_icon = "data:image/ico;base64," + \
                         site_user_info.site_favicon if site_user_info.site_favicon else site_user_info.site_url \
-                                                                                        + "/favicon.ico"
+                + "/favicon.ico"
             if not self.is_exists_site_favicon(site_user_info.site_name):
                 self._db.insert(SITEFAVICON(
                     SITE=site_user_info.site_name,

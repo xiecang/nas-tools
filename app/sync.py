@@ -32,7 +32,11 @@ class FileMonitorHandler(FileSystemEventHandler):
         self.sync.file_change_handler(event, "创建", event.src_path)
 
     def on_moved(self, event):
-        self.sync.file_change_handler(event, "移动", event.dest_path)
+        self.sync.file_change_handler(event, "移入", event.dest_path)
+        self.sync.file_delete_handler(event, "移出", event.src_path)
+
+    def on_deleted(self, event):
+        self.sync.file_delete_handler(event, '删除', event.src_path)
 
     """
     def on_modified(self, event):
@@ -125,6 +129,34 @@ class Sync(object):
         if not self.sync_dir_config:
             return []
         return [os.path.normpath(key) for key in self.sync_dir_config.keys()]
+
+    def file_delete_handler(self, event, text, event_path):
+        if not os.path.exists(event_path):
+            pass
+        log.debug("【Sync】文件%s：%s" % (text, event_path))
+        # 不是监控目录下的文件不处理
+        is_monitor_file = False
+        for tpath in self.sync_dir_config.keys():
+            if PathUtils.is_path_in_path(tpath, event_path):
+                is_monitor_file = True
+                break
+        if not is_monitor_file:
+            return
+        # 目的目录的子文件不处理
+        for tpath in self.sync_dir_config.values():
+            if not tpath:
+                continue
+            if PathUtils.is_path_in_path(tpath.get('target'), event_path):
+                return
+            if PathUtils.is_path_in_path(tpath.get('unknown'), event_path):
+                return
+        # 媒体库目录及子目录不处理
+        if self.filetransfer.is_target_dir_path(event_path):
+            return
+        # 回收站及隐藏的文件不处理
+        if PathUtils.is_invalid_path(event_path):
+            return
+        self.filetransfer.delete_dest_media(event_path)
 
     def file_change_handler(self, event, text, event_path):
         """
@@ -362,6 +394,8 @@ class Sync(object):
                                                                     rmt_mode=sync_mode)
                     if not ret:
                         log.error("【Sync】%s 处理失败：%s" % (monpath, ret_msg))
+            log.info("【Sync】目录：%s -> %s 同步完成" % (monpath, target_path))
+        log.info("【Sync】全部目录同步完成")
 
 
 def run_monitor():

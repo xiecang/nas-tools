@@ -1254,6 +1254,70 @@ class FileTransfer:
 
         return file_list, ""
 
+    def delete_dest_media(self, src_file_path):
+        records = self.dbhelper.get_transfer_history_exists_by_source_full_path(src_file_path)
+        if not records:
+            return
+        log.info(f"【Rmt】 开始删除 {src_file_path} 的目标文件")
+        refresh_library_items = []
+        for rec in records:
+            if not rec.DEST_PATH or not rec.DEST_FILENAME:
+                log.error(f"【Rmt] 存在非法数据, 数据ID： {rec.ID}")
+                continue
+            del_flag, del_msg = self.delete_file_path(rec.DEST_PATH, rec.DEST_FILENAME)
+            if not del_flag:
+                log.error(f"【Rmt] {del_msg}")
+            else:
+                log.info(f"【Rmt】{del_msg}")
+                self.dbhelper.delete_transfer_log_by_id(rec.ID)
+                # 媒体库刷新条目：类型-类别-标题-年份
+                refresh_item = {"type": rec.TYPE, "category": rec.CATEGORY, "title": rec.TITLE,
+                                "year": rec.YEAR, "target_path": rec.DEST_PATH}
+                # 登记媒体库刷新
+                if refresh_item not in refresh_library_items:
+                    refresh_library_items.append(refresh_item)
+        if refresh_library_items and self._refresh_mediaserver:
+            self.mediaserver.refresh_library_by_items(refresh_library_items)
+        pass
+
+    def delete_file_path(self, filedir, filename):
+        """
+        删除媒体文件，空目录也支被删除
+        """
+        filedir = os.path.normpath(filedir).replace("\\", "/")
+        file = os.path.join(filedir, filename)
+        try:
+            if not os.path.exists(file):
+                return True, f"{file}不存在"
+            if os.path.isdir(file):
+                shutil.rmtree(file)
+                return True, f"{file} 删除成功"
+            os.remove(file)
+            nfoname = f"{os.path.splitext(filename)[0]}.nfo"
+            nfofile = os.path.join(filedir, nfoname)
+            if os.path.exists(nfofile):
+                os.remove(nfofile)
+            # 检查空目录并删除
+            if re.findall(r"^S\d{2}|^Season", os.path.basename(filedir), re.I):
+                # 当前是季文件夹，判断并删除
+                seaon_dir = filedir
+                if seaon_dir.count('/') > 1 and not PathUtils.get_dir_files(seaon_dir, exts=RMT_MEDIAEXT):
+                    shutil.rmtree(seaon_dir)
+                # 媒体文件夹
+                media_dir = os.path.dirname(seaon_dir)
+            else:
+                media_dir = filedir
+            # 检查并删除媒体文件夹，非根目录且目录大于二级，且没有媒体文件时才会删除
+            if media_dir != '/' \
+                    and media_dir.count('/') > 1 \
+                    and not re.search(r'[a-zA-Z]:/$', media_dir) \
+                    and not PathUtils.get_dir_files(media_dir, exts=RMT_MEDIAEXT):
+                shutil.rmtree(media_dir)
+            return True, f"{file} 删除成功"
+        except Exception as e:
+            ExceptionUtils.exception_traceback(e)
+            return False, f"{file} 删除失败"
+
     def get_media_exists_flag(self, mtype, title, year, mediaid):
         """
         获取媒体存在标记：是否存在、是否订阅
