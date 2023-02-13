@@ -744,7 +744,7 @@ class Media:
             return None
         if mtype:
             meta_info.type = mtype
-        file_media_info = self.fill_media_info(meta_info, cache, strict, chinese, append_to_response)
+        file_media_info = self.__fill_media_info(meta_info, cache, strict, chinese, append_to_response)
         # 赋值TMDB信息并返回
         meta_info.set_tmdb_info(file_media_info)
         return meta_info
@@ -847,7 +847,7 @@ class Media:
                         log.warn("【Rmt】%s 未识别出有效信息！" % meta_info.org_string)
                         continue
                     # 区配缓存及TMDB
-                    file_media_info = self.fill_media_info(meta_info, True, False, chinese)
+                    file_media_info = self.__fill_media_info(meta_info, True, False, chinese)
                     meta_info.set_tmdb_info(file_media_info)
                 # 自带TMDB信息
                 else:
