@@ -150,13 +150,13 @@ class DbHelper:
         """
         if not media:
             return True
-        if self._db.query(DOUBANMEDIAS).filter(DOUBANMEDIAS.NAME == media.get_name()).count() > 0:
+        if self._db.query(DOUBANMEDIAS).filter(DOUBANMEDIAS.ID == media.douban_id).count() > 0:
             return True
         else:
             return False
 
     @DbPersist(_db)
-    def insert_douban_media_state(self, media, state):
+    def insert_douban_media_state(self, media, mark_date, state):
         """
         将豆瓣的数据插入数据库
         """
@@ -168,13 +168,15 @@ class DbHelper:
             # 插入
             self._db.insert(
                 DOUBANMEDIAS(
+                    ID=media.douban_id,
                     NAME=media.get_name(),
                     YEAR=media.year,
                     TYPE=media.type.value,
                     RATING=media.vote_average,
                     IMAGE=media.get_poster_image(),
                     STATE=state,
-                    ADD_TIME=time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
+                    ADD_TIME=time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())),
+                    MARK_DATE=mark_date
                 )
             )
 
@@ -2485,8 +2487,12 @@ class DbHelper:
             return
         self._db.query(DOUBANMEDIAS).filter(DOUBANMEDIAS.ID == int(hid)).delete()
 
-    def get_douban_history(self):
+    def get_douban_history(self, rownum=20, page=1):
         """
         查询豆瓣同步记录
         """
-        return self._db.query(DOUBANMEDIAS).order_by(DOUBANMEDIAS.ADD_TIME.desc()).all()
+        if int(page) == 1:
+            begin_pos = 0
+        else:
+            begin_pos = (int(page) - 1) * int(rownum)
+        return self._db.query(DOUBANMEDIAS).order_by(DOUBANMEDIAS.MARK_DATE.desc()).limit(int(rownum)).offset(begin_pos).all()
