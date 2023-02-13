@@ -2,8 +2,8 @@ import os.path
 import re
 import datetime
 from urllib.parse import quote, unquote
-
-from bencode import bdecode
+import hashlib
+from bencode import bdecode, bencode
 
 from app.utils.http_utils import RequestUtils
 from config import Config
@@ -49,7 +49,7 @@ class Torrent:
         :param ua: 站点UserAgent
         :param referer: 关联地址，有的网站需要这个否则无法下载
         :param proxy: 是否使用内置代理
-        :return: 种子保存路径、种子内容、种子文件列表主目录、种子文件列表、错误信息
+        :return: 种子Hash、种子保存路径、种子内容、种子文件列表主目录、种子文件列表、错误信息
         """
         if not url:
             return None, None, "", [], "URL为空"
@@ -63,11 +63,11 @@ class Torrent:
                                                                 referer=referer,
                                                                 proxy=proxy)
             if not file_path:
-                return None, content, "", [], errmsg
+                return "", None, content, "", [], errmsg
             # 解析种子文件
-            files_folder, files, retmsg = self.get_torrent_files(file_path)
+            hash, files_folder, files, retmsg = self.get_torrent_files(file_path)
             # 种子文件路径、种子内容、种子文件列表主目录、种子文件列表、错误信息
-            return file_path, content, files_folder, files, retmsg
+            return hash, file_path, content, files_folder, files, retmsg
 
         except Exception as err:
             return None, None, "", [], "下载种子文件出现异常：%s" % str(err)
@@ -122,6 +122,13 @@ class Torrent:
         return file_path, file_content, ""
 
     @staticmethod
+    def convert_magnet_to_hash(magnet):
+        ret = re.findall(r"magnet:\?xt=urn:btih:([0-9A-Fa-f]+)&dn", magnet)
+        if len(ret) > 0:
+            return ret[0].lower()
+        return None
+
+    @staticmethod
     def convert_hash_to_magnet(hash_text, title):
         """
         根据hash值，转换为磁力链，自动添加tracker
@@ -157,7 +164,7 @@ class Torrent:
     def get_torrent_files(path):
         """
         解析Torrent文件，获取文件清单
-        :return: 种子文件列表主目录、种子文件列表、错误信息
+        :return: 种子hash, 种子文件列表主目录、种子文件列表、错误信息
         """
         if not path or not os.path.exists(path):
             return "", [], f"种子文件不存在：{path}"
@@ -165,6 +172,7 @@ class Torrent:
         file_folder = ""
         try:
             torrent = bdecode(open(path, 'rb').read())
+            hash = hashlib.sha1(bencode(torrent.get("info"))).hexdigest()
             if torrent.get("info"):
                 files = torrent.get("info", {}).get("files") or []
                 if files:
@@ -175,8 +183,8 @@ class Torrent:
                 else:
                     file_names.append(torrent.get("info", {}).get("name"))
         except Exception as err:
-            return file_folder, file_names, "解析种子文件异常：%s" % str(err)
-        return file_folder, file_names, ""
+            return hash, file_folder, file_names, "解析种子文件异常：%s" % str(err)
+        return hash, file_folder, file_names, ""
 
     def read_torrent_content(self, path):
         """
@@ -185,16 +193,16 @@ class Torrent:
         """
         if not path or not os.path.exists(path):
             return None, "", [], "种子文件不存在：%s" % path
-        content, retmsg, file_folder, files = None, "", "", []
+        hash, content, retmsg, file_folder, files = "", None, "", "", []
         try:
             # 读取种子文件内容
             with open(path, 'rb') as f:
                 content = f.read()
             # 解析种子文件
-            file_folder, files, retmsg = self.get_torrent_files(path)
+            hash, file_folder, files, retmsg = self.get_torrent_files(path)
         except Exception as e:
             retmsg = "读取种子文件出错：%s" % str(e)
-        return content, file_folder, files, retmsg
+        return hash, content, file_folder, files, retmsg
 
     @staticmethod
     def __get_url_torrent_filename(req, url):
@@ -256,4 +264,3 @@ class Torrent:
             target_episodes = list(set(target_info.get("episodes")).intersection(set(source_info.get("episodes"))))
             target[title][index]["episodes"] = target_episodes
         return target
-

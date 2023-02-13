@@ -168,7 +168,7 @@ class WebAction:
             "get_directorysync": self.get_directorysync,
             "get_users": self.get_users,
             "get_filterrules": self.get_filterrules,
-            "get_downloading": self.get_downloading,
+            "get_torrents": self.get_torrents,
             "test_site": self.__test_site,
             "get_sub_path": self.__get_sub_path,
             "rename_file": self.__rename_file,
@@ -615,19 +615,25 @@ class WebAction:
             if not torrent:
                 continue
             if Client == DownloaderType.QB:
-                if torrent.get('state') in ['pausedDL']:
+                if torrent.get('state') in ['pausedDL', 'pausedUP']:
                     state = "Stoped"
                     speed = "已暂停"
                 else:
-                    state = "Downloading"
                     dlspeed = StringUtils.str_filesize(torrent.get('dlspeed'))
                     eta = StringUtils.str_timelong(torrent.get('eta'))
                     upspeed = StringUtils.str_filesize(torrent.get('upspeed'))
                     speed = "%s%sB/s %s%sB/s %s" % (chr(8595),
                                                     dlspeed, chr(8593), upspeed, eta)
-                # 进度
-                progress = round(torrent.get('progress') * 100)
-                # 主键
+                    # 进度
+                    progress = round(torrent.get('progress') * 100, 1)
+                    if progress >= 100:
+                        speed = "%s%sB/s %s%sB/s" % (chr(8595), dlspeed, chr(8593), upspeed)
+                        state = "Completed"
+                    else:
+                        eta = StringUtils.str_timelong(torrent.get('eta'))
+                        speed = "%s%sB/s %s%sB/s %s" % (chr(8595), dlspeed, chr(8593), upspeed, eta)
+                        state = "Downloading"
+                    # 主键
                 key = torrent.get('hash')
             elif Client == DownloaderType.Client115:
                 state = "Downloading"
@@ -3655,40 +3661,51 @@ class WebAction:
         mtype = data.get("type")
         return {"code": 0, "result": [rec.as_dict() for rec in self.dbhelper.get_rss_history(rtype=mtype)]}
 
-    @staticmethod
-    def get_downloading(data=None):
+    def get_torrents(self, data=None, type='downloading'):
         """
         查询正在下载的任务
         """
-        torrents = Downloader().get_downloading_progress()
+        torrents = []
+        if type == 'downloading':
+            torrents = Downloader().get_downloading_progress()
+        elif type == 'completed':
+            torrents = Downloader().get_completed_progress()
         MediaHander = Media()
+        group = {}
+        history = self.dbhelper.get_download_history(hash=list(map(lambda x: x.get("id"), torrents)))
+        history = {x.TORRENT_HASH: x for x in history}
         for torrent in torrents:
-            # 识别
+            poster_path = ''
             name = torrent.get("name")
-            media_info = MediaHander.get_media_info(title=name)
-            if not media_info:
-                torrent.update({
-                    "title": name,
-                    "image": ""
-                })
-                continue
-            if not media_info.tmdb_info:
-                year = media_info.year
-                if year:
-                    title = "%s (%s) %s" % (media_info.get_name(),
-                                            year, media_info.get_season_episode_string())
+            h = history.get(torrent.get("id"))
+            if h:
+                if h.YEAR:
+                    name = "%s (%s)" % (h.TITLE, h.YEAR)
                 else:
-                    title = "%s %s" % (media_info.get_name(),
-                                       media_info.get_season_episode_string())
+                    name = h.TITLE
+                poster_path = h.POSTER
             else:
-                title = "%s %s" % (media_info.get_title_string(
-                ), media_info.get_season_episode_string())
-            poster_path = media_info.get_poster_image()
-            torrent.update({
-                "title": title,
-                "image": poster_path or ""
-            })
-        return {"code": 0, "result": torrents}
+                media_info = MediaHander.get_media_info(title=name)
+                if not media_info:
+                    continue
+                self.dbhelper.insert_download_history(media_info, torrent.get("id"))
+                if not media_info.tmdb_info:
+                    year = media_info.year
+                    if year:
+                        name = "%s (%s)" % (media_info.get_name(), year)
+                    else:
+                        name = "%s" % (media_info.get_name())
+                else:
+                    name = "%s" % (media_info.get_title_string())
+                poster_path = media_info.get_poster_image()
+            item = group.get(name, {})
+            item['image'] = poster_path
+            added_on = item.get('added_on')
+            item['added_on'] = torrent.get('added_on') if (added_on and added_on < torrent.get('added_on')) or not added_on else added_on
+            item.setdefault('torrents', []).append(torrent)
+            group[name] = item
+        group = {k: v for k, v in sorted(group.items(), key=lambda item: item[1]['added_on'], reverse=True)}
+        return {"code": 0, "result": group}
 
     def get_transfer_history(self, data):
         """

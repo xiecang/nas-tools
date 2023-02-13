@@ -607,7 +607,7 @@ class BrushTask(object):
         # 下载任务ID
         download_id = None
         # 下载种子文件
-        _, content, _, _, retmsg = Torrent().get_torrent_info(
+        _, _, content, _, _, retmsg = Torrent().get_torrent_info(
             url=enclosure,
             cookie=site_info.get("cookie"),
             ua=site_info.get("ua"),
