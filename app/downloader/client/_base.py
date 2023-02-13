@@ -145,6 +145,13 @@ class _IDownloadClient(metaclass=ABCMeta):
         pass
 
     @abstractmethod
+    def get_completed_progress(self):
+        """
+        获取完成进度
+        """
+        pass
+
+    @abstractmethod
     def set_speed_limit(self, **kwargs):
         """
         设置速度限制

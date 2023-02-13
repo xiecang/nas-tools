@@ -512,9 +512,10 @@ def discovery_person():
 @App.route('/downloading', methods=['POST', 'GET'])
 @login_required
 def downloading():
-    DispTorrents = WebAction().get_downloading().get("result")
+    DispTorrents = WebAction().get_torrents(type='downloading').get("result")
     return render_template("download/downloading.html",
                            DownloadCount=len(DispTorrents),
+                           Page='Downloading',
                            Torrents=DispTorrents,
                            Client=Config().get_config("pt").get("pt_client"))
 
@@ -523,11 +524,12 @@ def downloading():
 @App.route('/downloaded', methods=['POST', 'GET'])
 @login_required
 def downloaded():
-    CurrentPage = request.args.get("page") or 1
-    return render_template("discovery/recommend.html",
-                           Type='DOWNLOADED',
-                           Title='近期下载',
-                           CurrentPage=CurrentPage)
+    DispTorrents = WebAction().get_torrents(type='completed').get("result")
+    return render_template("download/downloading.html",
+                           DownloadCount=len(DispTorrents),
+                           Page='Completed',
+                           Torrents=DispTorrents,
+                           Client=Config().get_config("pt").get("pt_client"))
 
 
 @App.route('/torrent_remove', methods=['POST', 'GET'])

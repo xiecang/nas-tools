@@ -510,7 +510,40 @@ class Qbittorrent(_IDownloadClient):
                 'name': torrent.get('name'),
                 'speed': speed,
                 'state': state,
-                'progress': progress
+                'progress': progress,
+                'added_on': torrent.get('added_on')
+            })
+        return DispTorrents
+
+    def get_completed_progress(self, tag=None):
+        """
+        获取已完成的种子进度
+        """
+        Torrents = self.get_completed_torrents(tag=tag)
+        DispTorrents = []
+        for torrent in Torrents:
+            # 进度
+            progress = round(torrent.get('progress') * 100, 1)
+            if torrent.get('state') in ['pausedUP']:
+                state = "Stoped"
+                speed = "已暂停"
+            else:
+                state = "Completed"
+                _dlspeed = StringUtils.str_filesize(torrent.get('dlspeed'))
+                _upspeed = StringUtils.str_filesize(torrent.get('upspeed'))
+                if progress >= 100:
+                    speed = "%s%sB/s %s%sB/s" % (chr(8595), _dlspeed, chr(8593), _upspeed)
+                else:
+                    eta = StringUtils.str_timelong(torrent.get('eta'))
+                    speed = "%s%sB/s %s%sB/s %s" % (chr(8595), _dlspeed, chr(8593), _upspeed, eta)
+            # 主键
+            DispTorrents.append({
+                'id': torrent.get('hash'),
+                'name': torrent.get('name'),
+                'speed': speed,
+                'progress': progress,
+                'state': state,
+                'added_on': torrent.get('added_on')
             })
         return DispTorrents
 

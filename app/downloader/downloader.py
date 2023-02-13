@@ -2,6 +2,7 @@ import os
 from threading import Lock
 
 import log
+import re
 from app.conf import ModuleConf
 from app.filetransfer import FileTransfer
 from app.helper import DbHelper, ThreadHelper, SubmoduleHelper
@@ -119,7 +120,7 @@ class Downloader:
     def download(self,
                  media_info,
                  is_paused=None,
-                 tag=None,
+                 tag=PT_TAG,
                  download_dir=None,
                  download_setting=None,
                  torrent_file=None):
@@ -138,11 +139,11 @@ class Downloader:
         # 详情页面
         page_url = media_info.page_url
         # 默认值
-        _xpath, _hash, site_info, dl_files_folder, dl_files, retmsg = None, False, {}, "", [], ""
+        _xpath, _hash, site_info, dl_files_folder, dl_files, retmsg, torrent_hash = None, False, {}, "", [], "", ""
         # 有种子文件时解析种子信息
         if torrent_file:
             url = os.path.basename(torrent_file)
-            content, dl_files_folder, dl_files, retmsg = Torrent().read_torrent_content(torrent_file)
+            torrent_hash, content, dl_files_folder, dl_files, retmsg = Torrent().read_torrent_content(torrent_file)
         # 没有种子文件解析链接
         else:
             url = media_info.enclosure
@@ -151,6 +152,9 @@ class Downloader:
             # 获取种子内容，磁力链不解析
             if url.startswith("magnet:"):
                 content = url
+                torrent_hash = Torrent.convert_magnet_to_hash(content)
+                if not torrent_hash:
+                    return None, "%s 非法的磁力链" % content
             else:
                 # [XPATH]为需从详情页面解析磁力链
                 if url.startswith("["):
@@ -169,10 +173,17 @@ class Downloader:
                         return None, "无法从详情页面：%s 解析出下载链接" % url
                     # 解析出磁力链，补充Trackers
                     if content.startswith("magnet:"):
+                        torrent_hash = Torrent.convert_magnet_to_hash(content)
+                        if not torrent_hash:
+                            return None, "%s 非法的磁力链" % content
                         content = Torrent.add_trackers_to_magnet(url=content, title=title)
                     # 解析出来的是HASH值，转换为磁力链
                     elif _hash:
-                        content = Torrent.convert_hash_to_magnet(hash_text=content, title=title)
+                        content = re.search(r'[0-9a-z]+', content, re.IGNORECASE)
+                        if not content:
+                            return None, "%s 转换磁力链失败" % content
+                        torrent_hash = content
+                        content = Torrent.convert_hash_to_magnet(hash_text=torrent_hash, title=title)
                         if not content:
                             return None, "%s 转换磁力链失败" % content
                 # 从HTTP链接下载种子
@@ -180,7 +191,7 @@ class Downloader:
                     # 获取Cookie和ua等
                     site_info = self.sites.get_site_attr(url)
                     # 下载种子文件，并读取信息
-                    _, content, dl_files_folder, dl_files, retmsg = Torrent().get_torrent_info(
+                    torrent_hash, _, content, dl_files_folder, dl_files, retmsg = Torrent().get_torrent_info(
                         url=url,
                         cookie=site_info.get("cookie"),
                         ua=site_info.get("ua"),
@@ -288,7 +299,7 @@ class Downloader:
             # 添加下载成功
             if ret:
                 # 登记下载历史
-                self.dbhelper.insert_download_history(media_info)
+                self.dbhelper.insert_download_history(media_info, torrent_hash)
                 # 下载站点字幕文件
                 if page_url \
                         and download_dir \
@@ -393,6 +404,18 @@ class Downloader:
         else:
             tag = None
         return self.default_client.get_downloading_progress(tag=tag)
+
+    def get_completed_progress(self):
+        """
+        查询已下载的进度信息
+        """
+        if not self.default_client:
+            return []
+        if self._pt_monitor_only:
+            tag = [PT_TAG]
+        else:
+            tag = None
+        return self.default_client.get_completed_progress(tag=tag)
 
     def get_torrents(self, torrent_ids):
         """
@@ -636,7 +659,7 @@ class Downloader:
                             continue
                         if not need_episodes:
                             break
-                        # 选中一个单季整季的或单季包括需要的所有集的
+                        # 选中一个单季整季的或单季包括需要的集的
                         if item.tmdb_id == need_tmdbid \
                                 and (not item.get_episode_list()
                                      or set(item.get_episode_list()).intersection(set(need_episodes))) \
@@ -1021,7 +1044,7 @@ class Downloader:
         """
         site_info = self.sites.get_site_attr(url)
         # 保存种子文件
-        file_path, _, _, files, retmsg = Torrent().get_torrent_info(
+        _, file_path, _, _, files, retmsg = Torrent().get_torrent_info(
             url=url,
             cookie=site_info.get("cookie"),
             ua=site_info.get("ua"),

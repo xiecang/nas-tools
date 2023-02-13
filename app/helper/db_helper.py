@@ -1254,7 +1254,7 @@ class DbHelper:
         for site_user_info in site_user_infos:
             site_icon = "data:image/ico;base64," + \
                         site_user_info.site_favicon if site_user_info.site_favicon else site_user_info.site_url \
-                                                                                        + "/favicon.ico"
+                + "/favicon.ico"
             if not self.is_exists_site_favicon(site_user_info.site_name):
                 self._db.insert(SITEFAVICON(
                     SITE=site_user_info.site_name,
@@ -1516,39 +1516,33 @@ class DbHelper:
         else:
             return 0, 0, [], [], []
 
-    def is_exists_download_history(self, title, tmdbid, mtype=None):
+    def is_exists_download_history(self, torrent_hash):
         """
         查询下载历史是否存在
         """
-        if not title or not tmdbid:
-            return False
-        if mtype:
-            count = self._db.query(DOWNLOADHISTORY).filter(
-                (DOWNLOADHISTORY.TITLE == title) | (DOWNLOADHISTORY.TMDBID == tmdbid),
-                DOWNLOADHISTORY.TYPE == mtype).count()
-        else:
-            count = self._db.query(DOWNLOADHISTORY).filter(
-                (DOWNLOADHISTORY.TITLE == title) | (DOWNLOADHISTORY.TMDBID == tmdbid)).count()
+        count = self._db.query(DOWNLOADHISTORY).filter(DOWNLOADHISTORY.TORRENT_HASH == torrent_hash).count()
         if count > 0:
             return True
         else:
             return False
 
     @DbPersist(_db)
-    def insert_download_history(self, media_info):
+    def insert_download_history(self, media_info, torrent_hash):
         """
         新增下载历史
         """
         if not media_info:
             return
-        if not media_info.title or not media_info.tmdb_id:
-            return
-        if self.is_exists_download_history(media_info.title, media_info.tmdb_id, media_info.type.value):
-            self._db.query(DOWNLOADHISTORY).filter(DOWNLOADHISTORY.TITLE == media_info.title,
-                                                   DOWNLOADHISTORY.TMDBID == media_info.tmdb_id,
-                                                   DOWNLOADHISTORY.TYPE == media_info.type.value).update(
+        title = media_info.title
+        if not media_info.title:
+            title = media_info.org_string
+        if self.is_exists_download_history(torrent_hash):
+            self._db.query(DOWNLOADHISTORY).filter(DOWNLOADHISTORY.TORRENT_HASH == torrent_hash).update(
                 {
                     "TORRENT": media_info.org_string,
+                    "TMDBID": media_info.tmdb_id,
+                    "TITLE": media_info.title,
+                    "TYPE": media_info.type.value,
                     "ENCLOSURE": media_info.enclosure,
                     "DESC": media_info.description,
                     "DATE": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())),
@@ -1557,8 +1551,9 @@ class DbHelper:
             )
         else:
             self._db.insert(DOWNLOADHISTORY(
-                TITLE=media_info.title,
+                TITLE=title,
                 YEAR=media_info.year,
+                TORRENT_HASH=torrent_hash,
                 TYPE=media_info.type.value,
                 TMDBID=media_info.tmdb_id,
                 VOTE=media_info.vote_average,
@@ -1571,7 +1566,7 @@ class DbHelper:
                 SITE=media_info.site
             ))
 
-    def get_download_history(self, date=None, hid=None, num=30, page=1):
+    def get_download_history(self, date=None, hid=None, hash=[], num=30, page=1):
         """
         查询下载历史
         """
@@ -1580,22 +1575,12 @@ class DbHelper:
         elif date:
             return self._db.query(DOWNLOADHISTORY).filter(
                 DOWNLOADHISTORY.DATE > date).order_by(DOWNLOADHISTORY.DATE.desc()).all()
+        elif hash:
+            return self._db.query(DOWNLOADHISTORY).filter(DOWNLOADHISTORY.TORRENT_HASH.in_(hash)).all()
         else:
             offset = (int(page) - 1) * int(num)
             return self._db.query(DOWNLOADHISTORY).order_by(
                 DOWNLOADHISTORY.DATE.desc()).limit(num).offset(offset).all()
-
-    def is_media_downloaded(self, title, tmdbid):
-        """
-        根据标题和年份检查是否下载过
-        """
-        if self.is_exists_download_history(title, tmdbid):
-            return True
-        count = self._db.query(TRANSFERHISTORY).filter(TRANSFERHISTORY.TITLE == title).count()
-        if count > 0:
-            return True
-        else:
-            return False
 
     @DbPersist(_db)
     def insert_brushtask(self, brush_id, item):

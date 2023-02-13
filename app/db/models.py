@@ -165,6 +165,7 @@ class DOWNLOADHISTORY(Base):
     TORRENT = Column(Text)
     ENCLOSURE = Column(Text)
     SITE = Column(Text)
+    TORRENT_HASH = Column(Text)
     DESC = Column(Text)
     DATE = Column(Text, index=True)
 
