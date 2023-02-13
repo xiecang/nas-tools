@@ -53,6 +53,7 @@ class MetaVideo(MetaBase):
         super().__init__(title, subtitle, fileflag)
         if not title:
             return
+        title = title.strip()
         original_title = title
         self._source = ""
         self._effect = []

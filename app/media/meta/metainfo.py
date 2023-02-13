@@ -33,10 +33,7 @@ def MetaInfo(title, subtitle=None, mtype=None):
     else:
         fileflag = False
 
-    if mtype == MediaType.ANIME or is_anime(title):
-        meta_info = MetaAnime(title, subtitle, fileflag)
-    else:
-        meta_info = MetaVideo(title, subtitle, fileflag)
+    meta_info = MetaVideo(title, subtitle, fileflag)
 
     meta_info.ignored_words = used_info.get("ignored")
     meta_info.replaced_words = used_info.get("replaced")
