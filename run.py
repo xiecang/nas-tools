@@ -1,3 +1,18 @@
+from config import Config
+import log
+from web.main import App
+from app.utils import SystemUtils, ConfigLoadCache
+from app.utils.commons import INSTANCES
+from app.db import init_db, update_db, init_data
+from app.helper import IndexerHelper, DisplayHelper, ChromeHelper
+from app.brushtask import BrushTask
+from app.rsschecker import RssChecker
+from app.scheduler import run_scheduler, restart_scheduler
+from app.sync import run_monitor, restart_monitor
+from app.torrentremover import TorrentRemover
+from app.speedlimiter import SpeedLimiter
+from check_config import update_config, check_config
+from version import APP_VERSION
 import os
 import signal
 import sys
@@ -31,22 +46,6 @@ if is_windows_exe:
     except Exception as err:
         print(str(err))
 
-from config import Config
-import log
-from web.main import App
-from app.utils import SystemUtils, ConfigLoadCache
-from app.utils.commons import INSTANCES
-from app.db import init_db, update_db, init_data
-from app.helper import IndexerHelper, DisplayHelper, ChromeHelper
-from app.brushtask import BrushTask
-from app.rsschecker import RssChecker
-from app.scheduler import run_scheduler, restart_scheduler
-from app.sync import run_monitor, restart_monitor
-from app.torrentremover import TorrentRemover
-from app.speedlimiter import SpeedLimiter
-from check_config import update_config, check_config
-from version import APP_VERSION
-
 
 def sigal_handler(num, stack):
     """
@@ -69,6 +68,7 @@ def get_run_config():
     _ssl_cert = None
     _ssl_key = None
     _debug = False
+    _use_reloader = False
 
     app_conf = Config().get_config('app')
     if app_conf:
@@ -79,8 +79,9 @@ def get_run_config():
         _ssl_key = app_conf.get('ssl_key')
         _ssl_key = app_conf.get('ssl_key')
         _debug = True if app_conf.get("debug") else False
+        _use_reloader = True if _debug else False
 
-    app_arg = dict(host=_web_host, port=_web_port, debug=_debug, threaded=True, use_reloader=False)
+    app_arg = dict(host=_web_host, port=_web_port, debug=_debug, threaded=True, use_reloader=_use_reloader)
     if _ssl_cert:
         app_arg['ssl_context'] = (_ssl_cert, _ssl_key)
     return app_arg
@@ -186,10 +187,8 @@ if __name__ == '__main__':
         sys.stdout = NullWriter()
         sys.stderr = NullWriter()
 
-
         def traystart():
             TrayIcon(homepage, log_path)
-
 
         if len(os.popen("tasklist| findstr %s" % os.path.basename(sys.executable), 'r').read().splitlines()) <= 2:
             p1 = threading.Thread(target=traystart, daemon=True)
