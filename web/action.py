@@ -2407,11 +2407,6 @@ class WebAction:
             medias = WebUtils.search_media_infos(
                 keyword=Keyword, source=Source, page=CurrentPage)
             res_list = [media.to_dict() for media in medias]
-        elif Type == "DOWNLOADED":
-            # 近期下载
-            res_list = self.get_downloaded({
-                "page": CurrentPage
-            }).get("Items")
         elif Type == "TRENDING":
             # TMDB流行趋势
             res_list = Media().get_tmdb_trending_all_week(page=CurrentPage)
