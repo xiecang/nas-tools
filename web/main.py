@@ -532,7 +532,7 @@ def downloading():
                            Client=Config().get_config("pt").get("pt_client"))
 
 
-# 近期下载页面
+# 已下载页面
 @App.route('/downloaded', methods=['POST', 'GET'])
 @login_required
 def downloaded():
