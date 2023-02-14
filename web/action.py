@@ -3727,6 +3727,8 @@ class WebAction:
             item.setdefault('torrents', []).append(torrent)
             group[name] = item
         group = {k: v for k, v in sorted(group.items(), key=lambda item: item[1]['added_on'], reverse=True)}
+        for name, item in group.items():
+            item['torrents'] = sorted(item['torrents'], key=lambda item: item['added_on'], reverse=True)
         return {"code": 0, "result": group}
 
     def get_transfer_history(self, data):
