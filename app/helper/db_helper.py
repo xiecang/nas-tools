@@ -1064,7 +1064,11 @@ class DbHelper:
             return []
         ret = self._db.query(RSSTVEPISODES).filter(RSSTVEPISODES.RSSID == rid).first()
         if ret:
-            return [int(epi) for epi in str(ret[0]).split(',')], dict(epi.split(":") for epi in ret.EPISODE_FILTER_ORDERS.split(","))
+            episode_filter_orders = {}
+            if ret.EPISODE_FILTER_ORDERS:
+                episode_filter_orders = dict([epi.split(":") for epi in ret.EPISODE_FILTER_ORDERS.split(",")])
+                episode_filter_orders = {int(k): int(v) for k, v in episode_filter_orders.items()}
+            return [int(epi) for epi in str(ret.EPISODES).split(',')], episode_filter_orders
         else:
             return None, None
 

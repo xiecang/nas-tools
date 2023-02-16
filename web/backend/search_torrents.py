@@ -427,40 +427,46 @@ def __search_media(in_from, media_info, user_id, user_name=None):
     Message().send_channel_msg(channel=in_from,
                                title="开始检索 %s ..." % media_info.title,
                                user_id=user_id)
-    search_result, no_exists, search_count, download_count = Searcher().search_one_media(media_info=media_info,
-                                                                                         in_from=in_from,
-                                                                                         no_exists=no_exists,
-                                                                                         sites=media_info.search_sites,
-                                                                                         user_name=user_name)
-    # 没有搜索到数据
-    if not search_count:
+    search_result = Searcher().search_one_media(media_info=media_info,
+                                                in_from=in_from,
+                                                no_exists=no_exists,
+                                                sites=media_info.search_sites,
+                                                user_name=user_name)
+    if not search_result:
+        # 没有搜索到数据
         Message().send_channel_msg(channel=in_from,
                                    title="%s 未搜索到任何资源" % media_info.title,
                                    user_id=user_id)
+    if Config().get_config("pt").get('search_auto', True):
+        download_result, no_exists = Downloader().download_media(
+            in_from=in_from,
+            no_exists=no_exists,
+            media_info=media_info,
+            media_list=search_result,
+            user_name=user_name)
+        if not download_result:
+            # 搜索到了但是没下载到数据
+            Message().send_channel_msg(channel=in_from,
+                                       title="%s 共搜索到%s个结果，但没有下载到任何资源" % (
+                                           media_info.title, len(search_result)),
+                                       user_id=user_id)
+        else:
+            # 没有下载完成，且打开了自动添加订阅
+            if no_exists.get(media_info.tmdb_id) and Config().get_config('pt').get('search_no_result_rss'):
+                # 添加订阅
+                __rss_media(in_from=in_from,
+                            media_info=media_info,
+                            user_id=user_id,
+                            state='R',
+                            user_name=user_name)
+
     else:
         # 搜索到了但是没开自动下载
-        if download_count is None:
-            Message().send_channel_msg(channel=in_from,
-                                       title="%s 共搜索到%s个资源，点击选择下载" % (media_info.title, search_count),
-                                       image=media_info.get_message_image(),
-                                       url="search",
-                                       user_id=user_id)
-            return
-        else:
-            # 搜索到了但是没下载到数据
-            if download_count == 0:
-                Message().send_channel_msg(channel=in_from,
-                                           title="%s 共搜索到%s个结果，但没有下载到任何资源" % (
-                                               media_info.title, search_count),
-                                           user_id=user_id)
-    # 没有下载完成，且打开了自动添加订阅
-    if not search_result and Config().get_config('pt').get('search_no_result_rss'):
-        # 添加订阅
-        __rss_media(in_from=in_from,
-                    media_info=media_info,
-                    user_id=user_id,
-                    state='R',
-                    user_name=user_name)
+        Message().send_channel_msg(channel=in_from,
+                                   title="%s 共搜索到%s个资源，点击选择下载" % (media_info.title, len(search_result)),
+                                   image=media_info.get_message_image(),
+                                   url="search",
+                                   user_id=user_id)
 
 
 def __rss_media(in_from, media_info, user_id=None, state='D', user_name=None):

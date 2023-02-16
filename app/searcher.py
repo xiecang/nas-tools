@@ -18,8 +18,6 @@ class Searcher:
     progress = None
     dbhelper = None
 
-    _search_auto = True
-
     def __init__(self):
         self.downloader = Downloader()
         self.media = Media()
@@ -30,7 +28,7 @@ class Searcher:
         self.init_config()
 
     def init_config(self):
-        self._search_auto = Config().get_config("pt").get('search_auto', True)
+        pass
 
     def search_medias(self,
                       key_word: [str, list],
@@ -56,10 +54,8 @@ class Searcher:
 
     def search_one_media(self, media_info: MetaVideo,
                          in_from: SearchType,
-                         no_exists: dict,
                          sites: list = None,
-                         filters: dict = None,
-                         user_name=None):
+                         filters: dict = None):
         """
         只检索和下载一个资源，用于精确检索下载，由微信、Telegram或豆瓣调用
         :param media_info: 已识别的媒体信息
@@ -74,7 +70,7 @@ class Searcher:
                  下载到的结果数量，如为None则表示未开启自动下载
         """
         if not media_info:
-            return None, {}, 0, 0
+            return None
         # 进度计数重置
         self.progress.start('search')
         # 查找的季
@@ -144,66 +140,18 @@ class Searcher:
                                             filter_args=filter_args,
                                             match_media=media_info,
                                             in_from=in_from)
-
         if len(media_list) == 0:
             log.info("【Searcher】%s 未搜索到任何资源" % second_search_name)
-            return None, no_exists, 0, 0
-        else:
-            if in_from in self.message.get_search_types():
-                # 保存搜索记录
-                self.dbhelper.delete_all_search_torrents()
-                # 搜索结果排序
-                media_list = sorted(media_list, key=lambda x: "%s%s%s%s" % (str(x.title).ljust(100, ' '),
-                                                                            str(x.res_order).rjust(3, '0'),
-                                                                            str(x.site_order).rjust(3, '0'),
-                                                                            str(x.seeders).rjust(10, '0')),
-                                    reverse=True)
-                # 插入数据库
-                self.dbhelper.insert_search_results(media_list)
-                # 微信未开自动下载时返回
-                if not self._search_auto:
-                    return None, no_exists, len(media_list), None
-            # 择优下载
-            download_items = []
-            if media_info.over_editiona and media_info.type == MediaType.MOVIE:
-                over_edition_media_list = [m for m in media_list
-                                           if any(m.res_order > [
-                                               no_exists[media_info.tmdb_id]['episode_filter_orders'][x] for x in m.get_episode_list()
-                                           ])]
-                over_edition_need_tvs = {}
-                for k, v in no_exists:
-                    over_edition_need_tvs[k] = {
-                        'episodes': [k for k, v in v['episode_filter_orders']],
-                        'season': v['season'],
-                        'total_episodes': v['total_episodes'],
-                    }
-                download_over_edition_items,  _ = self.downloader.batch_download(in_from=in_from,
-                                                                                 media_list=over_edition_media_list,
-                                                                                 need_tvs=over_edition_need_tvs,
-                                                                                 user_name=user_name)
-                if download_over_edition_items:
-                    download_items += download_over_edition_items
-                for item in download_over_edition_items:
-                    no_exists[media_info.tmdb_id]['episode_filter_orders'].update({e: item.res_order for e in item.get_episodes_list()})
-            download_lacked_items, left_medias = self.downloader.batch_download(in_from=in_from,
-                                                                                media_list=media_list,
-                                                                                need_tvs=no_exists,
-                                                                                user_name=user_name)
-            # 统计下载情况，下全了返回True，没下全返回False
-            if not download_items:
-                log.info("【Searcher】%s 未下载到资源" % media_info.title)
-                return None, no_exists, len(media_list), 0
-            else:
-                download_items += download_lacked_items
-                log.info("【Searcher】实际下载了 %s 个资源" % len(download_items))
-                # 还有剩下的缺失，说明没下完，返回False
-                if left_medias:
-                    for l, v in left_medias:
-                        if l not in no_exists:
-                            no_exists[l]['episodes'] = []
-                        else:
-                            no_exists[l]['episodes'] = v['episodes']
-                    return download_items, no_exists, len(media_list), len(download_items)
-                # 全部下完了
-                else:
-                    return download_items, no_exists, len(media_list), len(download_items)
+            return None
+        if in_from in self.message.get_search_types():
+            # 保存搜索记录
+            self.dbhelper.delete_all_search_torrents()
+            # 搜索结果排序
+            media_list = sorted(media_list, key=lambda x: "%s%s%s%s" % (str(x.title).ljust(100, ' '),
+                                                                        str(x.res_order).rjust(3, '0'),
+                                                                        str(x.site_order).rjust(3, '0'),
+                                                                        str(x.seeders).rjust(10, '0')),
+                                reverse=True)
+            # 插入数据库
+            self.dbhelper.insert_search_results(media_list)
+        return media_list

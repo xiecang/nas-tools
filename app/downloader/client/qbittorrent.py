@@ -290,7 +290,8 @@ class Qbittorrent(_IDownloadClient):
                     download_limit=None,
                     ratio_limit=None,
                     seeding_time_limit=None,
-                    cookie=None
+                    cookie=None,
+                    torrent_hash=None
                     ):
         """
         添加种子
@@ -344,6 +345,9 @@ class Qbittorrent(_IDownloadClient):
         else:
             seeding_time_limit = None
         try:
+            if len(self.get_torrents([torrent_hash])) > 0:
+                return True
+
             if self._auto_management:
                 use_auto_torrent_management = True
             else:
