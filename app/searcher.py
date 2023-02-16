@@ -6,7 +6,8 @@ from app.message import Message
 from app.downloader import Downloader
 from app.media import Media
 from app.helper import ProgressHelper
-from app.utils.types import SearchType
+from app.utils.types import SearchType, MediaType
+from app.media.meta import MetaVideo
 
 
 class Searcher:
@@ -53,7 +54,7 @@ class Searcher:
                                               match_media=match_media,
                                               in_from=in_from)
 
-    def search_one_media(self, media_info,
+    def search_one_media(self, media_info: MetaVideo,
                          in_from: SearchType,
                          no_exists: dict,
                          sites: list = None,
@@ -163,19 +164,46 @@ class Searcher:
                 if not self._search_auto:
                     return None, no_exists, len(media_list), None
             # 择优下载
-            download_items, left_medias = self.downloader.batch_download(in_from=in_from,
-                                                                         media_list=media_list,
-                                                                         need_tvs=no_exists,
-                                                                         user_name=user_name)
+            download_items = []
+            if media_info.over_editiona and media_info.type == MediaType.MOVIE:
+                over_edition_media_list = [m for m in media_list
+                                           if any(m.res_order > [
+                                               no_exists[media_info.tmdb_id]['episode_filter_orders'][x] for x in m.get_episode_list()
+                                           ])]
+                over_edition_need_tvs = {}
+                for k, v in no_exists:
+                    over_edition_need_tvs[k] = {
+                        'episodes': [k for k, v in v['episode_filter_orders']],
+                        'season': v['season'],
+                        'total_episodes': v['total_episodes'],
+                    }
+                download_over_edition_items,  _ = self.downloader.batch_download(in_from=in_from,
+                                                                                 media_list=over_edition_media_list,
+                                                                                 need_tvs=over_edition_need_tvs,
+                                                                                 user_name=user_name)
+                if download_over_edition_items:
+                    download_items += download_over_edition_items
+                for item in download_over_edition_items:
+                    no_exists[media_info.tmdb_id]['episode_filter_orders'].update({e: item.res_order for e in item.get_episodes_list()})
+            download_lacked_items, left_medias = self.downloader.batch_download(in_from=in_from,
+                                                                                media_list=media_list,
+                                                                                need_tvs=no_exists,
+                                                                                user_name=user_name)
             # 统计下载情况，下全了返回True，没下全返回False
             if not download_items:
                 log.info("【Searcher】%s 未下载到资源" % media_info.title)
-                return None, left_medias, len(media_list), 0
+                return None, no_exists, len(media_list), 0
             else:
+                download_items += download_lacked_items
                 log.info("【Searcher】实际下载了 %s 个资源" % len(download_items))
                 # 还有剩下的缺失，说明没下完，返回False
                 if left_medias:
-                    return None, left_medias, len(media_list), len(download_items)
+                    for l, v in left_medias:
+                        if l not in no_exists:
+                            no_exists[l]['episodes'] = []
+                        else:
+                            no_exists[l]['episodes'] = v['episodes']
+                    return download_items, no_exists, len(media_list), len(download_items)
                 # 全部下完了
                 else:
-                    return download_items[0], no_exists, len(media_list), len(download_items)
+                    return download_items, no_exists, len(media_list), len(download_items)

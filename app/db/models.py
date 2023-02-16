@@ -308,6 +308,7 @@ class RSSTVEPISODES(Base):
     ID = Column(Integer, Sequence('ID'), primary_key=True)
     RSSID = Column(Text, index=True)
     EPISODES = Column(Text)
+    EPISODE_FILTER_ORDERS = Column(Text)
 
 
 class TORRENTREMOVETASK(Base):
