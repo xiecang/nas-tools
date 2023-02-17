@@ -42,7 +42,13 @@ class Rss:
         """
         RSS订阅检索下载入口，由定时服务调用
         """
+        rss_items = {}
 
+        def __update_no_exist(rss_id, download_item, match_info, no_exists):
+            rss_items.setdefault(rss_id, {})
+            rss_items[rss_id].setdefault('media_list', []).append(download_item)
+            rss_items[rss_id]['match_info'] = match_info
+            rss_items[rss_id]['no_exists'] = no_exists
         if not self._sites:
             return
 
@@ -90,11 +96,7 @@ class Rss:
             else:
                 check_sites = list(set(check_sites))
 
-            # 匹配到的资源列表
-            rss_download_torrents = defaultdict(list)
-            rss_info_dict = {}
-            # 缺失的资源详情
-            rss_no_exists = {}
+            total_num = 0
             # 遍历站点资源
             for site_info in self._sites:
                 if not site_info:
@@ -195,7 +197,7 @@ class Rss:
                                                                                   tmdbid=media_info.tmdb_id))
                             if not media_info.tmdb_info:
                                 continue
-                            exist_flag, rss_no_exists = self.subscribe.get_no_exists(media_info, match_info)
+                            exist_flag, no_exists = self.subscribe.get_no_exists(media_info, match_info)
                             over_edition = match_info.get("over_edition")
                             if not over_edition and exist_flag:
                                 # 本地已存在
@@ -217,20 +219,20 @@ class Rss:
                         # 插入数据库历史记录
                         self.dbhelper.insert_rss_torrents(media_info)
                         # 加入下载列表
-                        if media_info not in rss_download_torrents:
-                            rss_download_torrents[match_info.get('id')].append(media_info)
-                            rss_info_dict[match_info.get("id")] = match_info
-                            res_num = res_num + 1
+
+                        __update_no_exist(match_info.get("id"), media_info, match_info, no_exists)
+                        res_num = res_num + 1
+                        total_num += 1
                     except Exception as e:
                         ExceptionUtils.exception_traceback(e)
                         log.error("【Rss】处理RSS发生错误：%s" % str(e))
                         continue
                 log.info("【Rss】%s 处理结束，匹配到 %s 个有效资源" % (site_name, res_num))
-            log.info("【Rss】所有RSS处理结束，共 %s 个有效资源" % len(rss_download_torrents))
-            if not rss_download_torrents:
+            log.info("【Rss】所有RSS处理结束，共 %s 个有效资源" % total_num)
+            if not rss_items:
                 return
-            for rid, items in rss_download_torrents.items():
-                self.subscribe.subscribe_media(rss_info_dict[rid], items, rss_no_exists)
+            for rid, item in rss_items.items():
+                self.subscribe.subscribe_media(item['match_info'], item['media_list'], item['no_exists'])
 
     @ staticmethod
     def parse_rssxml(url):
