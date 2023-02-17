@@ -876,11 +876,7 @@ class Subscribe:
                 "total_episodes": total_ep,
                 "episode_filter_orders": episode_filter_orders,
             }
-            if rss_no_exists.get(media_info.tmdb_id):
-                log.info("【Subscribe】%s 订阅缺失季集：%s" % (
-                    media_info.get_title_string(),
-                    rss_no_exists.get(media_info.tmdb_id)
-                ))
+            log.info("【Subscribe】%s 订阅缺失季集：%s" % (media_info.get_title_string(), rss_no_exists))
         return exist_flag, rss_no_exists
 
     def get_subscribe_tv_episodes(self, rssid):
