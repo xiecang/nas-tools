@@ -115,11 +115,10 @@ class DoubanSync:
                                     user_name=media_info.user_name)
 
                                 if search_result:
-                                    _, no_exists = self.downloader.download_media(
+                                    _, no_exists = self.downloader.batch_download(
                                         in_from=SearchType.DB,
-                                        no_exists=no_exists,
-                                        media_info=media_info,
                                         media_list=search_result,
+                                        need_tvs=no_exists,
                                         user_name=media_info.user_name)
                                     if not no_exists.get(media_info.tmdb_id):
                                         # 下载全了更新为已下载，没下载全的下次同步再次搜索

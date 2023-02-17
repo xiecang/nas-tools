@@ -438,11 +438,10 @@ def __search_media(in_from, media_info, user_id, user_name=None):
                                    title="%s 未搜索到任何资源" % media_info.title,
                                    user_id=user_id)
     if Config().get_config("pt").get('search_auto', True):
-        download_result, no_exists = Downloader().download_media(
+        download_result, no_exists = Downloader().batch_download(
             in_from=in_from,
-            no_exists=no_exists,
-            media_info=media_info,
             media_list=search_result,
+            need_tvs=no_exists,
             user_name=user_name)
         if not download_result:
             # 搜索到了但是没下载到数据

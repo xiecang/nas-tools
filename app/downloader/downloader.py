@@ -19,6 +19,8 @@ from app.utils.types import MediaType, DownloaderType, SearchType, RmtMode
 from config import Config, PT_TAG, RMT_MEDIAEXT
 from collections import defaultdict
 
+from app.media.meta import MetaVideo
+
 lock = Lock()
 client_lock = Lock()
 
@@ -538,11 +540,12 @@ class Downloader:
                 need_tvs.pop(tmdbid)
             return need
 
-        def __update_episodes(tmdbid, seq, need, current):
+        def __update_episodes(tmdbid, seq, need, current,):
             """
             更新need_tvs集数
             """
             need = list(set(need).difference(set(current)))
+            need_tvs[tmdbid][seq]["episodes"] = need
             if need:
                 need_tvs[tmdbid][seq]["episodes"] = need
             else:
@@ -608,6 +611,7 @@ class Downloader:
                                 need_season = __update_seasons(tmdbid=need_tmdbid,
                                                                need=need_season,
                                                                current=item_season)
+
         # 电视剧季内的集匹配
         if need_tvs:
             need_tv_list = list(need_tvs)
@@ -644,7 +648,6 @@ class Downloader:
                                                                       seq=index,
                                                                       current=item_episodes)
                     index += 1
-
         # 仍然缺失的剧集，从整季中选择需要的集数文件下载，仅支持QB和TR
         if need_tvs:
             need_tv_list = list(need_tvs)
