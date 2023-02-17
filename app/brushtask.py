@@ -607,7 +607,7 @@ class BrushTask(object):
         # 下载任务ID
         download_id = None
         # 下载种子文件
-        _, content, _, _, retmsg = Torrent().get_torrent_info(
+        torrent_hash, _, content, _, _, retmsg = Torrent().get_torrent_info(
             url=enclosure,
             cookie=site_info.get("cookie"),
             ua=site_info.get("ua"),
@@ -626,6 +626,7 @@ class BrushTask(object):
                 else:
                     tags = torrent_tag
                 ret = downloader.add_torrent(content=content,
+                                             torrent_hash=torrent_hash,
                                              tag=tags,
                                              download_dir=downloadercfg.get("save_dir"),
                                              upload_limit=upspeed,
@@ -646,6 +647,7 @@ class BrushTask(object):
                     log.error("【Brush】任务 %s 下载器 %s 无法连接" % (taskname, downloadercfg.get("name")))
                     return False
                 ret = downloader.add_torrent(content=content,
+                                             torrent_hash=torrent_hash,
                                              download_dir=downloadercfg.get("save_dir"),
                                              upload_limit=upspeed,
                                              download_limit=downspeed
