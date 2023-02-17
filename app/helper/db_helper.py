@@ -922,7 +922,8 @@ class DbHelper:
                       fuzzy_match=0,
                       desc=None,
                       note=None,
-                      keyword=None):
+                      keyword=None,
+                      rss_id=None):
         """
         新增RSS电视剧
         """
@@ -963,7 +964,8 @@ class DbHelper:
             STATE=state,
             DESC=desc,
             NOTE=note,
-            KEYWORD=keyword
+            KEYWORD=keyword,
+            ID=rss_id,
         ))
         return 0
 
@@ -995,7 +997,7 @@ class DbHelper:
             )
 
     @DbPersist(_db)
-    def delete_rss_tv(self, title=None, season=None, rssid=None, tmdbid=None):
+    def delete_rss_tv(self, title=None, season=None, rssid=None, tmdbid=None, delete_ep=False):
         """
         删除RSS电视剧
         """
@@ -1004,7 +1006,8 @@ class DbHelper:
         if not rssid:
             rssid = self.get_rss_tv_id(title=title, tmdbid=tmdbid, season=season)
         if rssid:
-            self.delete_rss_tv_episodes(rssid)
+            if delete_ep:
+                self.delete_rss_tv_episodes(rssid)
             self._db.query(RSSTVS).filter(RSSTVS.ID == int(rssid)).delete()
 
     def is_exists_rss_tv_episodes(self, rid):

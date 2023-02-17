@@ -12,6 +12,7 @@ from app.sites import Sites
 from app.subscribe import Subscribe
 from app.utils import DomUtils, RequestUtils, StringUtils, ExceptionUtils, RssTitleUtils, Torrent
 from app.utils.types import MediaType, SearchType
+from collections import defaultdict
 
 lock = Lock()
 
@@ -90,7 +91,8 @@ class Rss:
                 check_sites = list(set(check_sites))
 
             # 匹配到的资源列表
-            rss_download_torrents = []
+            rss_download_torrents = defaultdict(list)
+            rss_info_dict = {}
             # 缺失的资源详情
             rss_no_exists = {}
             # 遍历站点资源
@@ -198,13 +200,6 @@ class Rss:
                             if not over_edition and exist_flag:
                                 # 本地已存在
                                 continue
-                            if over_edition:
-                                # 把洗版标志加入检索
-                                media_info.over_edition = over_edition
-                                # 将当前的优先级传入检索
-                                media_info.res_order = self.dbhelper.get_rss_overedition_order(rtype=MediaType.TV,
-                                                                                               rssid=match_info.get("id"))
-                        # 模糊匹配
                         else:
                             # 不做处理，直接下载
                             pass
@@ -223,7 +218,8 @@ class Rss:
                         self.dbhelper.insert_rss_torrents(media_info)
                         # 加入下载列表
                         if media_info not in rss_download_torrents:
-                            rss_download_torrents.append(media_info)
+                            rss_download_torrents[match_info.get('id')].append(media_info)
+                            rss_info_dict[match_info.get("id")] = match_info
                             res_num = res_num + 1
                     except Exception as e:
                         ExceptionUtils.exception_traceback(e)
@@ -233,9 +229,10 @@ class Rss:
             log.info("【Rss】所有RSS处理结束，共 %s 个有效资源" % len(rss_download_torrents))
             if not rss_download_torrents:
                 return
-            self.subscribe.subscribe_media(media_info, rss_download_torrents, rss_no_exists)
+            for rid, items in rss_download_torrents.items():
+                self.subscribe.subscribe_media(rss_info_dict[rid], items, rss_no_exists)
 
-    @staticmethod
+    @ staticmethod
     def parse_rssxml(url):
         """
         解析RSS订阅URL，获取RSS中的种子信息
@@ -386,7 +383,7 @@ class Rss:
                 # 媒体匹配成功
                 match_flag = True
                 match_rss_info = rss_info
-
+                match_rss_info['type'] = MediaType.MOVIE
                 break
         # 匹配电视剧
         elif rss_tvs:
@@ -432,6 +429,7 @@ class Rss:
                 # 媒体匹配成功
                 match_flag = True
                 match_rss_info = rss_info
+                match_rss_info['type'] = MediaType.TV
                 break
         # 名称匹配成功，开始过滤
         if match_flag:

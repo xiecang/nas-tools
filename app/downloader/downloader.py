@@ -16,7 +16,8 @@ from app.utils import Torrent, StringUtils, SystemUtils, ExceptionUtils
 from app.utils.commons import singleton
 from app.utils.types import MediaType, DownloaderType, SearchType, RmtMode
 from config import Config, PT_TAG, RMT_MEDIAEXT
-from collections import defaultdict
+
+from app.media.meta import MetaVideo
 
 lock = Lock()
 client_lock = Lock()
@@ -513,11 +514,12 @@ class Downloader:
                 need_tvs.pop(tmdbid)
             return need
 
-        def __update_episodes(tmdbid, seq, need, current):
+        def __update_episodes(tmdbid, seq, need, current,):
             """
             更新need_tvs集数
             """
             need = list(set(need).difference(set(current)))
+            need_tvs[tmdbid][seq]["episodes"] = need
             if need:
                 need_tvs[tmdbid][seq]["episodes"] = need
             else:
@@ -583,6 +585,7 @@ class Downloader:
                                 need_season = __update_seasons(tmdbid=need_tmdbid,
                                                                need=need_season,
                                                                current=item_season)
+
         # 电视剧季内的集匹配
         if need_tvs:
             need_tv_list = list(need_tvs)
@@ -619,7 +622,6 @@ class Downloader:
                                                                       seq=index,
                                                                       current=item_episodes)
                     index += 1
-
         # 仍然缺失的剧集，从整季中选择需要的集数文件下载，仅支持QB和TR
         if need_tvs:
             need_tv_list = list(need_tvs)
@@ -1083,57 +1085,3 @@ class Downloader:
             ExceptionUtils.exception_traceback(err)
             upload_limit = 0
         _client.set_speed_limit(download_limit=download_limit, upload_limit=upload_limit)
-
-    def download_media(self,
-                       in_from: SearchType,
-                       no_exists: dict,
-                       media_info,
-                       media_list: list,
-                       user_name=None):
-
-        # 择优下载
-        download_items = []
-        if media_info.over_edition and media_info.type == MediaType.TV:
-            over_media_info = [x for x in no_exists[media_info.tmdb_id] if x['season'] == int(media_info.get_season_seq())][0]
-            over_edition_media_list = [m for m in media_list if any(int(m.res_order) > int(over_media_info['episode_filter_orders'][x]) for x in m.get_episode_list())]
-            over_edition_need_tvs = defaultdict(list)
-            for k, v in no_exists.items():
-                for v2 in v:
-                    over_edition_need_tvs[k].append({
-                        'episodes': [e for e, o in v2['episode_filter_orders'].items() if int(o) > 0],
-                        'season': v2['season'],
-                        'total_episodes': v2['total_episodes'],
-                    })
-            print(over_edition_need_tvs)
-            download_over_edition_items,  _ = self.batch_download(in_from=in_from,
-                                                                  media_list=over_edition_media_list,
-                                                                  need_tvs=over_edition_need_tvs,
-                                                                  user_name=user_name)
-            if download_over_edition_items:
-                download_items += download_over_edition_items
-
-        print(no_exists)
-        download_lacked_items, left_medias = self.batch_download(in_from=in_from,
-                                                                 media_list=media_list,
-                                                                 need_tvs=no_exists,
-                                                                 user_name=user_name)
-        download_items += download_lacked_items
-        # 统计下载情况，下全了返回True，没下全返回False
-        if not download_items:
-            log.info("【Searcher】%s 未下载到资源" % media_info.title)
-            return None, no_exists
-        else:
-            log.info("【Searcher】实际下载了 %s 个资源" % len(download_items))
-            for item in download_items:
-                season_item = [x for x in no_exists[media_info.tmdb_id] if x['season'] == int(media_info.get_season_seq())][0]
-                no_exists[media_info.tmdb_id][no_exists[media_info.tmdb_id].index(season_item)]['episode_filter_orders'].update({e: item.res_order for e in item.get_episode_list()})
-            print(no_exists)
-            # 还有剩下的缺失，说明没下完，返回False
-            if left_medias:
-                for tmdbid, v in no_exists.items():
-                    for index, _ in enumerate(v):
-                        if tmdbid not in left_medias:
-                            no_exists[tmdbid][index]['episodes'] = []
-                        else:
-                            no_exists[tmdbid][index]['episodes'] = left_medias[tmdbid][index]['episodes']
-            return download_items, no_exists
