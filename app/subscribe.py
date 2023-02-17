@@ -879,45 +879,6 @@ class Subscribe:
             log.info("【Subscribe】%s 订阅缺失季集：%s" % (media_info.get_title_string(), rss_no_exists))
         return exist_flag, rss_no_exists
 
-    def get_no_exists(self, media_info, rss_info):
-        rss_no_exists = {}
-        exist_flag = False
-        if media_info.type == MediaType.MOVIE:
-            exist_flag, rss_no_exists, _ = self.downloader.check_exists_medias(
-                meta_info=media_info,
-                no_exists=rss_no_exists
-            )
-        else:
-            # 从登记薄中获取缺失剧集
-            season = 1
-            if rss_info.get("season"):
-                season = int(str(rss_info.get("season")).replace("S", ""))
-            # 自定义集数
-            total_ep = rss_info.get("total")
-            current_ep = rss_info.get("current_ep")
-            # 表中记录的剩余订阅集数
-            episodes, episode_filter_orders = self.get_subscribe_tv_episodes(rss_info.get("id"))
-            if not episode_filter_orders:
-                episode_filter_orders = {k: 0 for k in range(current_ep or 1, total_ep+1)}
-            if episodes is None:
-                episodes = []
-                if current_ep:
-                    episodes = list(range(current_ep, total_ep + 1))
-            rss_no_exists[media_info.tmdb_id] = [
-                {
-                    "season": season,
-                    "episodes": episodes,
-                    "total_episodes": total_ep,
-                    "episode_filter_orders": episode_filter_orders,
-                }
-            ]
-            if rss_no_exists.get(media_info.tmdb_id):
-                log.info("【Subscribe】%s 订阅缺失季集：%s" % (
-                    media_info.get_title_string(),
-                    rss_no_exists.get(media_info.tmdb_id)
-                ))
-        return exist_flag, rss_no_exists
-
     def get_subscribe_tv_episodes(self, rssid):
         """
         查询数据库中订阅的电视剧缺失集数
