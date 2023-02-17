@@ -968,7 +968,7 @@ class DbHelper:
         return 0
 
     @DbPersist(_db)
-    def update_rss_tv_lack(self, title=None, year=None, season=None, rssid=None, lack_episodes: list = None):
+    def update_rss_tv_lack(self, title=None, year=None, season=None, rssid=None, lack_episodes: list = None, episode_filter_orders: dict = None):
         """
         更新电视剧缺失的集数
         """
@@ -979,7 +979,7 @@ class DbHelper:
         else:
             lack = len(lack_episodes)
         if rssid:
-            self.update_rss_tv_episodes(rssid, lack_episodes)
+            self.update_rss_tv_episodes(rssid, lack_episodes, episode_filter_orders)
             self._db.query(RSSTVS).filter(RSSTVS.ID == int(rssid)).update(
                 {
                     "LACK": lack
@@ -1020,7 +1020,7 @@ class DbHelper:
             return False
 
     @DbPersist(_db)
-    def update_rss_tv_episodes(self, rid, episodes):
+    def update_rss_tv_episodes(self, rid, episodes: list, episode_filter_orders: dict):
         """
         插入或更新电视剧订阅缺失剧集
         """
@@ -1033,13 +1033,15 @@ class DbHelper:
         if self.is_exists_rss_tv_episodes(rid):
             self._db.query(RSSTVEPISODES).filter(RSSTVEPISODES.RSSID == int(rid)).update(
                 {
-                    "EPISODES": ",".join(episodes)
+                    "EPISODE_FILTER_ORDERS": ",".join([f'{key}:{value}' for key, value in episode_filter_orders.items()]),
+                    "EPISODES": ",".join(episodes),
                 }
             )
         else:
             self._db.insert(RSSTVEPISODES(
                 RSSID=rid,
-                EPISODES=",".join(episodes)
+                EPISODE_FILTER_ORDERS=",".join([f'{key}:{value}' for key, value in episode_filter_orders.items()]),
+                EPISODES=",".join(episodes),
             ))
 
     def get_rss_tv_episodes(self, rid):
@@ -1048,11 +1050,15 @@ class DbHelper:
         """
         if not rid:
             return []
-        ret = self._db.query(RSSTVEPISODES.EPISODES).filter(RSSTVEPISODES.RSSID == rid).first()
+        ret = self._db.query(RSSTVEPISODES).filter(RSSTVEPISODES.RSSID == rid).first()
         if ret:
-            return [int(epi) for epi in str(ret[0]).split(',')]
+            episode_filter_orders = {}
+            if ret.EPISODE_FILTER_ORDERS:
+                episode_filter_orders = dict([epi.split(":") for epi in ret.EPISODE_FILTER_ORDERS.split(",")])
+                episode_filter_orders = {int(k): int(v) for k, v in episode_filter_orders.items()}
+            return [int(epi) for epi in str(ret.EPISODES).split(',')], episode_filter_orders
         else:
-            return None
+            return None, None
 
     @DbPersist(_db)
     def delete_rss_tv_episodes(self, rid):

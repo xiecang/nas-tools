@@ -106,14 +106,22 @@ class DoubanSync:
                                 # 合并季
                                 media_info.begin_season = media.begin_season
                                 # 开始检索
-                                search_result, no_exists, search_count, download_count = self.searcher.search_one_media(
+                                search_result = self.searcher.search_one_media(
                                     media_info=media_info,
                                     in_from=SearchType.DB,
                                     no_exists=no_exists,
                                     user_name=media_info.user_name)
+
                                 if search_result:
-                                    # 下载全了更新为已下载，没下载全的下次同步再次搜索
-                                    self.dbhelper.insert_douban_media_state(media, "DOWNLOADED")
+                                    _, no_exists = self.downloader.download_media(
+                                        in_from=SearchType.DB,
+                                        no_exists=no_exists,
+                                        media_info=media_info,
+                                        media_list=search_result,
+                                        user_name=media_info.user_name)
+                                    if not no_exists.get(media_info.tmdb_id):
+                                        # 下载全了更新为已下载，没下载全的下次同步再次搜索
+                                        self.dbhelper.insert_douban_media_state(media, "DOWNLOADED")
                             else:
                                 # 需要加订阅，则由订阅去检索
                                 log.info(

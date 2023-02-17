@@ -290,7 +290,7 @@ class Qbittorrent(_IDownloadClient):
                     download_limit=None,
                     ratio_limit=None,
                     seeding_time_limit=None,
-                    cookie=None
+                    cookie=None,
                     ):
         """
         添加种子
