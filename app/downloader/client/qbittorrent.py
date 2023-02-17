@@ -345,7 +345,8 @@ class Qbittorrent(_IDownloadClient):
         else:
             seeding_time_limit = None
         try:
-            if len(self.get_torrents([torrent_hash])) > 0:
+            exist, _ = self.get_torrents(ids=[torrent_hash])
+            if len(exist) > 0:
                 return True
             if self._auto_management:
                 use_auto_torrent_management = True
