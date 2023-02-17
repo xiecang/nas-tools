@@ -269,18 +269,19 @@ class Downloader:
                 log.info("【Downloader】添加下载任务：%s，目录：%s，Url：%s" % (title, download_dir, print_url))
             if dl_type == DownloaderType.TR:
                 ret = downloader.add_torrent(content,
+                                             torrent_hash=torrent_hash,
                                              is_paused=is_paused,
                                              download_dir=download_dir,
                                              cookie=site_info.get("cookie"))
                 if ret:
                     downloader.change_torrent(tid=ret.id,
-                                              tag=tags,
                                               upload_limit=upload_limit,
                                               download_limit=download_limit,
                                               ratio_limit=ratio_limit,
                                               seeding_time_limit=seeding_time_limit)
             elif dl_type == DownloaderType.QB:
                 ret = downloader.add_torrent(content,
+                                             torrent_hash=torrent_hash,
                                              is_paused=is_paused,
                                              download_dir=download_dir,
                                              tag=tags,
@@ -293,6 +294,7 @@ class Downloader:
                                              cookie=site_info.get("cookie"))
             else:
                 ret = downloader.add_torrent(content,
+                                             torrent_hash=torrent_hash,
                                              is_paused=is_paused,
                                              tag=tags,
                                              download_dir=download_dir,

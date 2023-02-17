@@ -281,6 +281,7 @@ class Qbittorrent(_IDownloadClient):
 
     def add_torrent(self,
                     content,
+                    torrent_hash,
                     is_paused=False,
                     download_dir=None,
                     tag=None,
@@ -344,6 +345,8 @@ class Qbittorrent(_IDownloadClient):
         else:
             seeding_time_limit = None
         try:
+            if len(self.get_torrents([torrent_hash])) > 0:
+                return True
             if self._auto_management:
                 use_auto_torrent_management = True
             else:
