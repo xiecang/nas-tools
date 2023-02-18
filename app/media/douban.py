@@ -76,10 +76,10 @@ class DouBan:
         log.info("【Douban】查询到数据：%s" % douban_info.get("title"))
         return douban_info
 
-    def get_douban_id(self, metainfo):
-        return self.__search_douban_id(metainfo)
+    def search_douban(self, metainfo):
+        return self.__search_douban(metainfo)
 
-    def __search_douban_id(self, metainfo):
+    def __search_douban(self, metainfo):
         """
         给定名称和年份，查询一条豆瓣信息返回对应ID
         :param metainfo: 已进行识别过的媒体信息
@@ -96,7 +96,7 @@ class DouBan:
                 douban_meta = MetaInfo(title=res.get("target", {}).get("title"))
                 if metainfo.title == douban_meta.get_name() \
                         and (int(res.get("target", {}).get("year")) in year_range or not year_range):
-                    return res.get("target_id")
+                    return res.get("target_id"), {"vote": res.get("target", {}).get("rating", {}).get("value")}
             return None
         elif metainfo.type == MediaType.TV or metainfo.type == MediaType.ANIME:
             search_res = self.doubanapi.tv_search(metainfo.title).get("items") or []
@@ -110,14 +110,14 @@ class DouBan:
                 if metainfo.title == douban_meta.get_name() \
                         and metainfo.get_season_string() == douban_meta.get_season_string():
                     return res.get("target_id")
-            return search_res[0].get("target_id")
+            return search_res[0].get("target_id"), {"vote": res.get("target", {}).get("rating", {}).get("value")}
 
     def get_douban_info(self, metainfo):
         """
         查询附带演职人员的豆瓣信息
         :param metainfo: 已进行识别过的媒体信息
         """
-        doubanid = self.__search_douban_id(metainfo)
+        doubanid, _ = self.__search_douban(metainfo)
         if not doubanid:
             return None
         if metainfo.type == MediaType.MOVIE:
