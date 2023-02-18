@@ -469,7 +469,7 @@
           <div class="mb-3">
             <div class="btn-list">
               <label class="form-label">订阅站点</label>
-              <a href="javascript:void(0)" class="ms-auto" onclick="select_btn_SelectALL(this, 'rss_sites')">全选</a>
+              <a href="javascript:void(0)" id="rss_sites_select_all" class="ms-auto" onclick="select_btn_SelectALL(this, 'rss_sites')">全选</a>
             </div>
             <div class="form-selectgroup" id="rss_sites_group"></div>
           </div>
@@ -478,7 +478,7 @@
           <div class="mb-3">
             <div class="btn-list">
               <label class="form-label">搜索站点</label>
-              <a href="javascript:void(0)" class="ms-auto" onclick="select_btn_SelectALL(this, 'search_sites')">全选</a>
+              <a href="javascript:void(0)" id="rss_search_sites_select_all" class="ms-auto" onclick="select_btn_SelectALL(this, 'search_sites')">全选</a>
             </div>
             <div class="form-selectgroup" id="rss_search_sites_group"></div>
           </div>
@@ -1196,7 +1196,7 @@
   }
 
   //新增订阅
-  function add_rss_manual(flag) {
+  function add_rss_manual(flag, func=null) {
     const mtype = $("#rss_type").val();
     const name = $("#rss_name").val();
     const year = $("#rss_year").val();
@@ -1246,16 +1246,10 @@
     }
     //订阅站点
     let rss_sites = select_GetSelectedVAL("rss_sites");
-    if (rss_sites.length === RSS_SITES_LENGTH) {
-      rss_sites = [];
-    }
     //搜索站点
     let search_sites = [];
     if (!fuzzy_match) {
       search_sites = select_GetSelectedVAL("search_sites");
-      if (search_sites.length === SEARCH_SITES_LENGTH) {
-        search_sites = [];
-      }
     }
     // 储存订阅设置
     const rss_setting = {
@@ -1292,10 +1286,13 @@
         if (CURRENT_PAGE_URI.startsWith("tv_rss") || CURRENT_PAGE_URI.startsWith("movie_rss")) {
           window_history_refresh();
         } else {
-          show_rss_success_modal(ret.rssid, type, name + " 添加订阅成功！");
+          show_rss_success_modal(ret.rssid, mtype, name + " 添加订阅成功！");
         }
         if (flag) {
           show_add_rss_media_modal(mtype);
+        }
+        if (func) {
+          func()
         }
       } else {
         if (CURRENT_PAGE_URI.startsWith("tv_rss") || CURRENT_PAGE_URI.startsWith("movie_rss")) {
@@ -1349,19 +1346,19 @@
   }
 
   // 新增订阅
-  function show_add_rss_media_modal(mtype) {
+  function show_add_rss_media_modal(mtype, title='', year='', tmdb_id='', func=null) {
     // 刷新下拉框
     refresh_rss_download_setting_dirs();
     // 界面初始化
     $("#rss_id").val("");
     $("#rss_modal_title").text("新增订阅");
-    $("#rss_name").val("").attr("readonly", false);
-    $("#rss_year").val("").attr("readonly", false);
+    $("#rss_name").val(title).attr("readonly", false);
+    $("#rss_year").val(year).attr("readonly", false);
     $("#rss_keyword").val("");
-    $("#rss_tmdbid").val("");
+    $("#rss_tmdbid").val(tmdb_id);
     $("#fuzzy_match").prop("checked", false);
     $("#over_edition").prop("checked", false);
-    $("#rss_season").val("");
+    $("#rss_season").val(1);
     $("#rss_total_ep").val("");
     $("#rss_current_ep").val("");
     let rss_setting;
@@ -1383,15 +1380,13 @@
       $("#rss_download_setting").val(rss_setting.download_setting);
       refresh_savepath_select('rss_save_path', false, rss_setting.download_setting)
       $("#rss_save_path").val(rss_setting.save_path);
-      if (rss_setting.search_sites.length === 0) {
-        select_SelectALL(true, 'search_sites')
-      } else {
-        select_SelectPart(rss_setting.search_sites, 'search_sites');
+      select_SelectPart(rss_setting.search_sites, 'search_sites');
+      select_SelectPart(rss_setting.rss_sites, 'rss_sites');
+      if (rss_setting.search_sites.length == $(`input[${select_name('rss_search_sites')}][type=checkbox]`).length) {
+        $('#rss_search_sites_select_all').text("全不选")
       }
-      if (rss_setting.rss_sites.length === 0) {
-        select_SelectALL(true, 'rss_sites')
-      } else {
-        select_SelectPart(rss_setting.rss_sites, 'rss_sites');
+      if (rss_setting.rss_sites.length == $(`input[${select_name('rss_sites')}][type=checkbox]`).length) {
+        $('#rss_sites_select_all').text("全不选")
       }
     } else {
       $("#rss_restype").val('');
@@ -1403,6 +1398,12 @@
       select_SelectALL(false, "rss_sites");
       select_SelectALL(false, "search_sites");
     }
+    if (func) {
+      $("[name='rss_add_btn']").click( () => {
+        func()
+      })
+    }
+
     $("[name='rss_edit_btn']").hide();
     $("[name='rss_add_btn']").show();
     $("#rss_delete_btn").hide();
@@ -1468,15 +1469,13 @@
         $("#rss_download_setting").val(ret.detail.download_setting);
         refresh_savepath_select('rss_save_path', false, ret.detail.download_setting)
         $("#rss_save_path").val(ret.detail.save_path);
-        if (ret.detail.rss_sites.length === 0) {
-          select_SelectALL(true, 'rss_sites');
-        } else {
-          select_SelectPart(ret.detail.rss_sites, 'rss_sites')
+        select_SelectPart(ret.detail.rss_sites, 'rss_sites')
+        select_SelectPart(ret.detail.search_sites, 'search_sites')
+        if (ret.detail.search_sites.length == $(`input[${select_name('rss_search_sites')}][type=checkbox]`).length) {
+          $('#rss_search_sites_select_all').text("全不选")
         }
-        if (ret.detail.search_sites.length === 0) {
-          select_SelectALL(true, 'search_sites');
-        } else {
-          select_SelectPart(ret.detail.search_sites, 'search_sites')
+        if (ret.detail.rss_sites.length == $(`input[${select_name('rss_sites')}][type=checkbox]`).length) {
+          $('#rss_sites_select_all').text("全不选")
         }
         $("[name='rss_add_btn']").hide();
         $("[name='rss_edit_btn']").show();
