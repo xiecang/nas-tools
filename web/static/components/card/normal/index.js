@@ -117,7 +117,7 @@ export class NormalCard extends observeState(CustomElement) {
            @click=${() => { if (Golbal.is_touch_device()) { cardState.more_id = this._card_id } }}
            @mouseenter=${() => { if (!Golbal.is_touch_device()) { cardState.more_id = this._card_id } }}
            @mouseleave=${() => { if (!Golbal.is_touch_device()) { cardState.more_id = undefined } }}>
-        <div class="card-img-top ratio shadow-sm">
+        <div class="card-img-top ratio shadow-sm rounded-4">
         ${this._placeholder ? NormalCardPlaceholder.render_placeholder() : nothing}
         <div ?hidden=${this._placeholder} class="rounded-4">
           <img class="card-img rounded-4" alt="" style="box-shadow:0 0 0 1px #888888; display: block; min-width: 100%; max-width: 100%; min-height: 100%; max-height: 100%; object-fit: cover;"
