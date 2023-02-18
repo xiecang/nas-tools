@@ -57,17 +57,12 @@ class Searcher:
                          sites: list = None,
                          filters: dict = None):
         """
-        只检索和下载一个资源，用于精确检索下载，由微信、Telegram或豆瓣调用
+        只检索一个资源，用于精确检索，由RSS、微信、Telegram或豆瓣调用
         :param media_info: 已识别的媒体信息
         :param in_from: 搜索渠道
-        :param no_exists: 缺失的剧集清单
         :param sites: 检索哪些站点
         :param filters: 过滤条件，为空则不过滤
-        :param user_name: 用户名
-        :return: 请求的资源是否全部下载完整，如完整则返回媒体信息
-                 请求的资源如果是剧集则返回下载后仍然缺失的季集信息
-                 搜索到的结果数量
-                 下载到的结果数量，如为None则表示未开启自动下载
+        :return: 搜索到的结果
         """
         if not media_info or sites == []:
             return None

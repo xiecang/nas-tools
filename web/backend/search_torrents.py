@@ -429,7 +429,6 @@ def __search_media(in_from, media_info, user_id, user_name=None):
                                user_id=user_id)
     search_result = Searcher().search_one_media(media_info=media_info,
                                                 in_from=in_from,
-                                                no_exists=no_exists,
                                                 sites=media_info.search_sites,
                                                 user_name=user_name)
     if not search_result:
