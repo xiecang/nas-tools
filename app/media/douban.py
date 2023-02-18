@@ -76,6 +76,9 @@ class DouBan:
         log.info("【Douban】查询到数据：%s" % douban_info.get("title"))
         return douban_info
 
+    def get_douban_id(self, metainfo):
+        return self.__search_douban_id(metainfo)
+
     def __search_douban_id(self, metainfo):
         """
         给定名称和年份，查询一条豆瓣信息返回对应ID
@@ -95,7 +98,7 @@ class DouBan:
                         and (int(res.get("target", {}).get("year")) in year_range or not year_range):
                     return res.get("target_id")
             return None
-        elif metainfo.type == MediaType.TV:
+        elif metainfo.type == MediaType.TV or metainfo.type == MediaType.ANIME:
             search_res = self.doubanapi.tv_search(metainfo.title).get("items") or []
             if not search_res:
                 return None

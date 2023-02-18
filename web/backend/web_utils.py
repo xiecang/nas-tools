@@ -101,6 +101,7 @@ class WebUtils:
                 media_info = Media().get_media_info(title=f"{title_cn} {year}",
                                                     mtype=MediaType.TV,
                                                     append_to_response="all")
+            media_info.douban_id = DouBan().get_douban_id(media_info)
         else:
             # TMDB
             info = Media().get_tmdb_info(tmdbid=mediaid,
@@ -110,6 +111,7 @@ class WebUtils:
                 return None
             media_info = MetaInfo(title=info.get("title") if mtype == MediaType.MOVIE else info.get("name"))
             media_info.set_tmdb_info(info)
+            media_info.douban_id = DouBan().get_douban_id(media_info)
 
         return media_info
 
