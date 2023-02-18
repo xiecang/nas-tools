@@ -847,14 +847,12 @@ class Subscribe:
         """
         获取媒体信息的存在情况
         """
-        rss_no_exists = {}
         exist_flag = False
         if media_info.type == MediaType.MOVIE:
             exist_flag, _, _ = self.downloader.check_exists_medias(
                 meta_info=media_info,
             )
         else:
-
             # 从登记薄中获取缺失剧集
             season = 1
             if rss_info.get("season"):
@@ -866,10 +864,8 @@ class Subscribe:
             episodes, episode_filter_orders = self.get_subscribe_tv_episodes(rss_info.get("id"))
             if not episode_filter_orders:
                 episode_filter_orders = {k: 0 for k in range(current_ep or 1, total_ep+1)}
-            if episodes is None:
-                episodes = []
-                if current_ep:
-                    episodes = list(range(current_ep, total_ep + 1))
+            if not episodes:
+                episodes = list(range(current_ep or 1, total_ep + 1))
             rss_no_exists = {
                 "season": season,
                 "episodes": episodes,
