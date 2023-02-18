@@ -385,7 +385,6 @@ class Rss:
                 # 媒体匹配成功
                 match_flag = True
                 match_rss_info = rss_info
-                match_rss_info['type'] = MediaType.MOVIE
                 break
         # 匹配电视剧
         elif rss_tvs:
@@ -431,7 +430,6 @@ class Rss:
                 # 媒体匹配成功
                 match_flag = True
                 match_rss_info = rss_info
-                match_rss_info['type'] = MediaType.TV
                 break
         # 名称匹配成功，开始过滤
         if match_flag:

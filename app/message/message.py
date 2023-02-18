@@ -356,20 +356,26 @@ class Message(object):
                     url='movie_rss' if media_info.type == MediaType.MOVIE else 'tv_rss'
                 )
 
-    def send_rss_finished_message(self, media_info):
+    def send_rss_finished_message(self, rss_info):
         """
         发送订阅完成的消息，只针对电视剧
         """
-        if media_info.type == MediaType.MOVIE:
+        type = rss_info.get('type')
+        over_edition = rss_info.get('over_edition')
+        name = rss_info.get('name')
+        season = rss_info.get('season') or ''
+        vote = rss_info.get('vote')
+        image = rss_info.get('image')
+        if type == MediaType.MOVIE:
             return
         else:
-            if media_info.over_edition:
-                msg_title = f"{media_info.get_title_string()} {media_info.get_season_string()} 已完成洗版"
+            if over_edition:
+                msg_title = f"{name} {season} 已完成洗版"
             else:
-                msg_title = f"{media_info.get_title_string()} {media_info.get_season_string()} 已完成订阅"
-        msg_str = f"类型：{media_info.type.value}"
-        if media_info.vote_average:
-            msg_str = f"{msg_str}，{media_info.get_vote_string()}"
+                msg_title = f"{name} {season} 已完成订阅"
+        msg_str = f"类型：{type.value}"
+        if vote:
+            msg_str = f"{msg_str}，评分：{vote}"
         # 插入消息中心
         self.messagecenter.insert_system_message(level="INFO", title=msg_title, content=msg_str)
         # 发送消息
@@ -379,7 +385,7 @@ class Message(object):
                     client=client,
                     title=msg_title,
                     text=msg_str,
-                    image=media_info.get_message_image(),
+                    image=image,
                     url='downloaded'
                 )
 
