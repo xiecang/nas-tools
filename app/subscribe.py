@@ -722,7 +722,10 @@ class Subscribe:
         # 择优下载
         download_items = []
         need_tvs = defaultdict(list)
-        if type == MediaType.TV:
+        if type == MediaType.MOVIE:
+            if over_edition:
+                media_list = [m for m in media_list if m.res_order > res_order]
+        else:
             if over_edition:
                 over_edition_media_list = [m for m in media_list if any(int(m.res_order) > int(no_exists['episode_filter_orders'][x]) for x in m.get_episode_list())]
                 over_edition_need_tvs = defaultdict(list)
@@ -741,11 +744,6 @@ class Subscribe:
                 'season': no_exists['season'],
                 'total_episodes': no_exists['total_episodes'],
             })
-        elif type == MediaType.MOVIE:
-            if over_edition:
-                media_list = [m for m in media_list if m.res_order > res_order]
-        else:
-            return
 
         if not media_list:
             return
