@@ -11,9 +11,9 @@ export class NormalCard extends observeState(CustomElement) {
     tmdb_id: { attribute: "card-tmdbid" },
     res_type: { attribute: "card-restype" },
     media_type: { attribute: "card-mediatype" },
-    show_sub: { attribute: "card-showsub"},
+    show_sub: { attribute: "card-showsub" },
     title: { attribute: "card-title" },
-    fav: { attribute: "card-fav" , reflect: true},
+    fav: { attribute: "card-fav", reflect: true },
     date: { attribute: "card-date" },
     vote: { attribute: "card-vote" },
     image: { attribute: "card-image" },
@@ -56,7 +56,7 @@ export class NormalCard extends observeState(CustomElement) {
   }
 
   _render_right_up() {
-     if (this.fav == "2") {
+    if (this.fav == "2") {
       return html`
         <div class="badge badge-pill bg-green" style="position:absolute;top:10px;right:10px;padding:0;">
           <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check" width="24" height="24"
@@ -113,15 +113,16 @@ export class NormalCard extends observeState(CustomElement) {
 
   render() {
     return html`
-      <div class="card card-sm lit-normal-card rounded-4 cursor-pointer ratio shadow-sm"
-           @click=${() => { if (Golbal.is_touch_device()){ cardState.more_id = this._card_id } } }
-           @mouseenter=${() => { if (!Golbal.is_touch_device()){ cardState.more_id = this._card_id } } }
-           @mouseleave=${() => { if (!Golbal.is_touch_device()){ cardState.more_id = undefined } } }>
+      <div class="card card-sm lit-normal-card rounded-4 cursor-pointer bg-transparent"
+           @click=${() => { if (Golbal.is_touch_device()) { cardState.more_id = this._card_id } }}
+           @mouseenter=${() => { if (!Golbal.is_touch_device()) { cardState.more_id = this._card_id } }}
+           @mouseleave=${() => { if (!Golbal.is_touch_device()) { cardState.more_id = undefined } }}>
+        <div class="card-img-top ratio shadow-sm">
         ${this._placeholder ? NormalCardPlaceholder.render_placeholder() : nothing}
         <div ?hidden=${this._placeholder} class="rounded-4">
           <img class="card-img rounded-4" alt="" style="box-shadow:0 0 0 1px #888888; display: block; min-width: 100%; max-width: 100%; min-height: 100%; max-height: 100%; object-fit: cover;"
              src=${this.lazy == "1" ? "" : this.image ?? Golbal.noImage}
-             @error=${() => { if (this.lazy != "1") {this.image = Golbal.noImage; this._card_image_error = true} }}
+             @error=${() => { if (this.lazy != "1") { this.image = Golbal.noImage; this._card_image_error = true } }}
              @load=${() => { this._placeholder = false }}/>
           ${this._render_left_up()}
           ${this._render_right_up()}
@@ -131,31 +132,33 @@ export class NormalCard extends observeState(CustomElement) {
              style="background-color: rgba(0, 0, 0, 0.5); box-shadow:0 0 0 1px #dddddd;"
              @click=${() => { navmenu(`media_detail?type=${this.media_type}&id=${this.tmdb_id}`) }}>
           <div style="cursor: pointer">
-            ${this.year ? html`<div class="text-white"><strong>${this.site ? this.site : this.year}</strong></div>` : nothing }
+            ${this.year ? html`<div class="text-white"><strong>${this.site ? this.site : this.year}</strong></div>` : nothing}
             ${this.title
-            ? html`
+        ? html`
               <h2 class="lh-sm text-white"
                   style="margin-bottom: 5px; -webkit-line-clamp:3; display: -webkit-box; -webkit-box-orient:vertical; overflow:hidden; text-overflow: ellipsis;">
                 <strong>${this.title}</strong>
               </h2>`
-            : nothing }
+        : nothing}
             ${this.overview
-            ? html`
+        ? html`
               <p class="lh-sm text-white"
                  style="margin-bottom: 5px; -webkit-line-clamp:6; display: -webkit-box; -webkit-box-orient:vertical; overflow:hidden; text-overflow: ellipsis;">
                 ${this.overview}
               </p>`
-            : nothing }
+        : nothing}
             ${this.date
-            ? html`
+        ? html`
               <p class="lh-sm text-white"
                 style="margin-bottom: 5px; -webkit-line-clamp:4; display: -webkit-box; -webkit-box-orient:vertical; overflow:hidden; text-overflow: ellipsis;">
                 <small>${this.date}</small>
               </p>`
-            : nothing }
+        : nothing}
           </div>
           ${this._render_bottom()}
         </div>
+        </div>
+        <strong class="card-text text-center p-1 ">${this.title}</strong>
       </div>
     `;
   }
@@ -183,7 +186,7 @@ export class NormalCard extends observeState(CustomElement) {
         this._fav_change();
       });
   }
-  
+
 }
 
 window.customElements.define("normal-card", NormalCard);
