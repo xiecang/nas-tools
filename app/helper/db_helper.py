@@ -1256,7 +1256,7 @@ class DbHelper:
         for site_user_info in site_user_infos:
             site_icon = "data:image/ico;base64," + \
                         site_user_info.site_favicon if site_user_info.site_favicon else site_user_info.site_url \
-                                                                                        + "/favicon.ico"
+                + "/favicon.ico"
             if not self.is_exists_site_favicon(site_user_info.site_name):
                 self._db.insert(SITEFAVICON(
                     SITE=site_user_info.site_name,
@@ -2487,12 +2487,8 @@ class DbHelper:
             return
         self._db.query(DOUBANMEDIAS).filter(DOUBANMEDIAS.ID == int(hid)).delete()
 
-    def get_douban_history(self, rownum=20, page=1):
+    def get_douban_history(self):
         """
         查询豆瓣同步记录
         """
-        if int(page) == 1:
-            begin_pos = 0
-        else:
-            begin_pos = (int(page) - 1) * int(rownum)
-        return self._db.query(DOUBANMEDIAS).order_by(DOUBANMEDIAS.MARK_DATE.desc()).limit(int(rownum)).offset(begin_pos).all()
+        return self._db.query(DOUBANMEDIAS).order_by(DOUBANMEDIAS.ADD_TIME.desc()).all()
