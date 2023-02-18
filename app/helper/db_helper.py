@@ -941,7 +941,7 @@ class DbHelper:
             season_str = media_info.get_season_string()
         if self.is_exists_rss_tv(media_info.title, media_info.year, season_str):
             return 9
-        self._db.insert(RSSTVS(
+        res_tv = RSSTVS(
             NAME=media_info.title,
             YEAR=media_info.year,
             SEASON=season_str,
@@ -965,8 +965,11 @@ class DbHelper:
             DESC=desc,
             NOTE=note,
             KEYWORD=keyword,
-            ID=rss_id,
-        ))
+        )
+        if rss_id:
+            res_tv.ID = rss_id
+
+        self._db.insert(res_tv)
         return 0
 
     @DbPersist(_db)
