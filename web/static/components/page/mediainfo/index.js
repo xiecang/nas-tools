@@ -27,14 +27,14 @@ export class PageMediainfo extends CustomElement {
 
   firstUpdated() {
     // 媒体信息、演员阵容
-    Golbal.get_cache_or_ajax("media_detail", "info", { "type": this.media_type, "tmdbid": this.tmdbid},
+    Golbal.get_cache_or_ajax("media_detail", "info", { "type": this.media_type, "tmdbid": this.tmdbid },
       (ret) => {
         if (ret.code === 0) {
           this.media_info = ret.data;
           this.tmdbid = ret.data.tmdbid;
           this.fav = ret.data.fav;
           // 类似
-          Golbal.get_cache_or_ajax("get_recommend", "sim", { "type": this.media_type, "subtype": "sim", "tmdbid": ret.data.tmdbid, "page": 1},
+          Golbal.get_cache_or_ajax("get_recommend", "sim", { "type": this.media_type, "subtype": "sim", "tmdbid": ret.data.tmdbid, "page": 1 },
             (ret) => {
               if (ret.code === 0) {
                 this.similar_media = ret.Items;
@@ -42,7 +42,7 @@ export class PageMediainfo extends CustomElement {
             }
           );
           // 推荐
-          Golbal.get_cache_or_ajax("get_recommend", "more", { "type": this.media_type, "subtype": "more", "tmdbid": ret.data.tmdbid, "page": 1},
+          Golbal.get_cache_or_ajax("get_recommend", "more", { "type": this.media_type, "subtype": "more", "tmdbid": ret.data.tmdbid, "page": 1 },
             (ret) => {
               if (ret.code === 0) {
                 this.recommend_media = ret.Items;
@@ -97,52 +97,52 @@ export class PageMediainfo extends CustomElement {
               <div class="d-flex justify-content-center">
                 <div class="d-flex flex-column justify-content-end ms-2 mt-2">
                   ${this.fav == "2"
-                  ? html`
+        ? html`
                     <div class="align-self-center align-self-md-start me-1 mb-1">
                       <strong class="badge badge-pill bg-green text-white">已下载</strong>
                     </div>`
-                  : nothing }
+        : nothing}
                   <h1 class="align-self-center align-self-md-start display-6">
                     <strong>${this.media_info.title ?? this._render_placeholder("200px")}</strong>
                     <strong class="h1" ?hidden=${!this.media_info.year}>(${this.media_info.year})</strong>
                   </h1>
                   <div class="align-self-center align-self-md-start">
-                    ${this.media_info.vote > 0 ? html`<a href="${this.media_info.douban_link}" target="_blank" ?hidden=${!this.media_info.douban_id}><span class="badge badge-outline text-orange">${this.media_info.vote}</span></a>` : nothing}
+                    <a href="${this.media_info.douban_link}" target="_blank" ?hidden=${!this.media_info.douban_id}><span class="badge badge-outline text-orange">${this.media_info.vote > 0 ? this.media_info.vote : '暂无评分'}</span></a>
                     <a href="${this.media_info.link}" target="_blank" ?hidden=${!this.media_info.tmdbid}><span class="badge badge-outline text-green">${this.media_info.tmdbid}</span></a>
                     <span class="ms-1" ?hidden=${!this.media_info.runtime}>${this.media_info.runtime}</span>
                     <span ?hidden=${!this.media_info.genres}>| ${this.media_info.genres}</span>
-                    ${Object.keys(this.media_info).length === 0 ? this._render_placeholder("205px") : nothing }
+                    ${Object.keys(this.media_info).length === 0 ? this._render_placeholder("205px") : nothing}
                   </div>
                   <div class="align-self-center align-self-md-start me-1 mt-2">
                     ${Object.keys(this.media_info).length !== 0
-                    ? html`
+        ? html`
                       <span class="btn btn-primary btn-pill me-1"
                         @click=${(e) => {
-                          e.stopPropagation();
-                          media_search(this.tmdbid + "", this.media_info.title, this.media_type);
-                        }}>
+            e.stopPropagation();
+            media_search(this.tmdbid + "", this.media_info.title, this.media_type);
+          }}>
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><circle cx="10" cy="10" r="7"></circle><line x1="21" y1="21" x2="15" y2="15"></line></svg>
                         搜索资源
                       </span>
                       ${this.fav == "1"
-                      ? html`
+            ? html`
                         <span class="btn btn-pill btn-pinterest"
                           @click=${this._loveClick}>
                           <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="4" y1="7" x2="20" y2="7" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
                           删除订阅
                         </span>`
-                      : html`
+            : html`
                         <span class="btn btn-pill btn-purple"
                           @click=${this._loveClick}>
                           <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M19.5 12.572l-7.5 7.428l-7.5 -7.428m0 0a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572" /></svg>
                           添加订阅
                         </span>`
-                      }`
-                    : html`
+          }`
+        : html`
                       <span class="me-1">${this._render_placeholder("100px", "30px")}</span>
                       <span class="me-1">${this._render_placeholder("100px", "30px")}</span>
                       `
-                    }
+      }
                   </div>
                 </div>
               </div>
@@ -159,7 +159,7 @@ export class PageMediainfo extends CustomElement {
             </h2>
             <div class="row mx-2 mt-4">
               ${this.media_info.crews
-              ? this.media_info.crews.map((item, index) => ( html`
+        ? this.media_info.crews.map((item, index) => (html`
                 <div class="col-12 col-md-6 col-lg-4">
                   <h2 class="">
                     <strong>${Object.keys(item)[0]}</strong>
@@ -168,16 +168,16 @@ export class PageMediainfo extends CustomElement {
                     <strong>${Object.values(item)[0]}</strong>
                   </p>
                 </div>
-                `) )
-              : nothing }
+                `))
+        : nothing}
             </div>
           </div>
           <div class="col-lg-4">
             ${this.media_info.fact
-            ? html`
+        ? html`
               <div class="ms-3 me-2 mt-1">
                 <div class="card rounded-3" style="background: none">
-                  ${this.media_info.fact.map((item) => ( html`
+                  ${this.media_info.fact.map((item) => (html`
                     <div class="card-body p-2">
                       <div class="d-flex justify-content-between">
                         <div class="align-self-center" style="min-width:25%;">
@@ -188,10 +188,10 @@ export class PageMediainfo extends CustomElement {
                         </div>
                       </div>
                     </div>
-                    `) ) }
+                    `))}
                 </div>
               </div>`
-            : this._render_placeholder("200px", "200px", "col-12") }
+        : this._render_placeholder("200px", "200px", "col-12")}
           </div>
         </div>
 
@@ -202,7 +202,7 @@ export class PageMediainfo extends CustomElement {
             slide-title="演员阵容"
             slide-click='javascript:navmenu("discovery_person?tmdbid=${this.tmdbid}&type=${this.media_type}&title=演员&subtitle=${this.media_info.title}")'
             lazy="person-card"
-            .slide_card=${this.media_info.actors.map((item) => ( html`
+            .slide_card=${this.media_info.actors.map((item) => (html`
               <person-card
                 lazy=1
                 person-id=${item.id}
@@ -210,12 +210,12 @@ export class PageMediainfo extends CustomElement {
                 person-name=${item.name}
                 person-role=${item.role}
                 @click=${() => {
-                  navmenu("recommend?type="+this.media_type+"&subtype=person&personid="+item.id+"&title=参演作品&subtitle="+item.name)
-                }}
+            navmenu("recommend?type=" + this.media_type + "&subtype=person&personid=" + item.id + "&title=参演作品&subtitle=" + item.name)
+          }}
               ></person-card>`))
-            }
+          }
           ></custom-slide>`
-        : nothing }
+        : nothing}
 
         <!-- 渲染类似影片 -->
         ${this.similar_media.length
@@ -224,13 +224,13 @@ export class PageMediainfo extends CustomElement {
             slide-title="类似"
             slide-click='javascript:navmenu("recommend?type=${this.media_type}&subtype=sim&tmdbid=${this.tmdbid}&title=类似&subtitle=${this.media_info.title}")'
             lazy="normal-card"
-            .slide_card=${this.similar_media.map((item, index) => ( html`
+            .slide_card=${this.similar_media.map((item, index) => (html`
               <normal-card
                 @fav_change=${(e) => {
-                  Golbal.update_fav_data("get_recommend", "sim", (extra) => (
-                    extra.Items[index].fav = e.detail.fav, extra
-                  ));
-                }}
+            Golbal.update_fav_data("get_recommend", "sim", (extra) => (
+              extra.Items[index].fav = e.detail.fav, extra
+            ));
+          }}
                 lazy=1
                 card-tmdbid=${item.id}
                 card-mediatype=${item.type}
@@ -242,9 +242,9 @@ export class PageMediainfo extends CustomElement {
                 card-title=${item.title}
                 card-overview=${item.overview}
               ></normal-card>`))
-            }
+          }
           ></custom-slide>`
-        : nothing }
+        : nothing}
 
         <!-- 渲染推荐影片 -->
         ${this.recommend_media.length
@@ -253,13 +253,13 @@ export class PageMediainfo extends CustomElement {
             slide-title="推荐"
             slide-click='javascript:navmenu("recommend?type=${this.media_type}&subtype=more&tmdbid=${this.tmdbid}&title=推荐&subtitle=${this.media_info.title}")'
             lazy="normal-card"
-            .slide_card=${this.recommend_media.map((item, index) => ( html`
+            .slide_card=${this.recommend_media.map((item, index) => (html`
               <normal-card
                 @fav_change=${(e) => {
-                  Golbal.update_fav_data("get_recommend", "more", (extra) => (
-                    extra.Items[index].fav = e.detail.fav, extra
-                  ));
-                }}
+            Golbal.update_fav_data("get_recommend", "more", (extra) => (
+              extra.Items[index].fav = e.detail.fav, extra
+            ));
+          }}
                 lazy=1
                 card-tmdbid=${item.id}
                 card-mediatype=${item.type}
@@ -271,9 +271,9 @@ export class PageMediainfo extends CustomElement {
                 card-title=${item.title}
                 card-overview=${item.overview}
               ></normal-card>`))
-            }
+          }
           ></custom-slide>`
-        : nothing }
+        : nothing}
 
       </div>
     `;
