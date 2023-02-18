@@ -76,7 +76,6 @@ class WebUtils:
             title = info.get("title")
             original_title = info.get("original_title")
             year = info.get("year")
-            vote = info.get("rating", {}).get("value")
             if original_title:
                 media_info = Media().get_media_info(title=f"{original_title} {year}",
                                                     mtype=mtype,
@@ -86,9 +85,6 @@ class WebUtils:
                                                     mtype=mtype,
                                                     append_to_response="all")
             media_info.douban_id = doubanid
-            if vote:
-                media_info.vote_average = vote
-
         elif str(mediaid).startswith("BG:"):
             # BANGUMI
             bangumiid = str(mediaid)[3:]
@@ -106,8 +102,6 @@ class WebUtils:
                                                     mtype=MediaType.TV,
                                                     append_to_response="all")
             media_info.douban_id, info = DouBan().search_douban(media_info)
-            if info.get('vote', None):
-                media_info.vote_average = info.get('vote')
         else:
             # TMDB
             info = Media().get_tmdb_info(tmdbid=mediaid,
@@ -117,10 +111,10 @@ class WebUtils:
                 return None
             media_info = MetaInfo(title=info.get("title") if mtype == MediaType.MOVIE else info.get("name"))
             media_info.set_tmdb_info(info)
-            media_info.douban_id, info = DouBan().search_douban(media_info)
-            if info.get('vote', None):
-                media_info.vote_average = info.get('vote')
-
+        if info.get("rating"):
+            media_info.vote_average = info.get("rating").get("value")
+        else:
+            media_info.vote_average = None
         return media_info
 
     @staticmethod

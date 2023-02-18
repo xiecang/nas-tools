@@ -91,12 +91,12 @@ class DouBan:
         if metainfo.type == MediaType.MOVIE:
             search_res = self.doubanapi.movie_search(metainfo.title).get("items") or []
             if not search_res:
-                return None
+                return None, None
             for res in search_res:
                 douban_meta = MetaInfo(title=res.get("target", {}).get("title"))
                 if metainfo.title == douban_meta.get_name() \
                         and (int(res.get("target", {}).get("year")) in year_range or not year_range):
-                    return res.get("target_id"), {"vote": res.get("target", {}).get("rating", {}).get("value")}
+                    return res.get("target_id"), res.get("target", {})
             return None
         elif metainfo.type == MediaType.TV or metainfo.type == MediaType.ANIME:
             search_res = self.doubanapi.tv_search(metainfo.title).get("items") or []
@@ -106,11 +106,11 @@ class DouBan:
                 douban_meta = MetaInfo(title=res.get("target", {}).get("title"))
                 if metainfo.title == douban_meta.get_name() \
                         and (str(res.get("target", {}).get("year")) == str(metainfo.year) or not metainfo.year):
-                    return res.get("target_id")
+                    return res.get("target_id"), res.get("targe", {})
                 if metainfo.title == douban_meta.get_name() \
                         and metainfo.get_season_string() == douban_meta.get_season_string():
-                    return res.get("target_id")
-            return search_res[0].get("target_id"), {"vote": res.get("target", {}).get("rating", {}).get("value")}
+                    return res.get("target_id"), res.get("target", {})
+            return search_res[0].get("target_id"), search_res[0].get("target", {})
 
     def get_douban_info(self, metainfo):
         """
