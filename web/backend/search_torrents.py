@@ -414,7 +414,7 @@ def __search_media(in_from, media_info, user_id, user_name=None):
     开始搜索和发送消息
     """
     # 检查是否存在，电视剧返回不存在的集清单
-    exist_flag, no_exists, messages = Downloader().check_exists_medias(meta_info=media_info)
+    exist_flag, need_tvs, messages = Downloader().check_exists_medias(meta_info=media_info)
     if messages:
         Message().send_channel_msg(channel=in_from,
                                    title="\n".join(messages),
@@ -440,7 +440,7 @@ def __search_media(in_from, media_info, user_id, user_name=None):
         download_result, no_exists = Downloader().batch_download(
             in_from=in_from,
             media_list=search_result,
-            need_tvs=no_exists,
+            need_tvs={media_info.tmdb_id: need_tvs},
             user_name=user_name)
         if not download_result:
             # 搜索到了但是没下载到数据

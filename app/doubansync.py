@@ -97,7 +97,7 @@ class DoubanSync:
                                 log.warn("【Douban】%s 未查询到媒体信息" % media.get_name())
                                 continue
                             # 检查是否存在，电视剧返回不存在的集清单
-                            exist_flag, no_exists, _ = self.downloader.check_exists_medias(meta_info=media_info)
+                            exist_flag, need_tvs, _ = self.downloader.check_exists_medias(meta_info=media_info)
                             # 已经存在
                             if exist_flag:
                                 # 更新为已下载状态
@@ -117,7 +117,7 @@ class DoubanSync:
                                     _, no_exists = self.downloader.batch_download(
                                         in_from=SearchType.DB,
                                         media_list=search_result,
-                                        need_tvs=no_exists,
+                                        need_tvs={media_info.tmdb_id: need_tvs},
                                         user_name=media_info.user_name)
                                     if not no_exists.get(media_info.tmdb_id):
                                         # 下载全了更新为已下载，没下载全的下次同步再次搜索
