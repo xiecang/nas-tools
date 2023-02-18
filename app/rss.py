@@ -197,8 +197,8 @@ class Rss:
                                                                                   tmdbid=media_info.tmdb_id))
                             if not media_info.tmdb_info:
                                 continue
-                            exist_flag, no_exists = self.subscribe.get_no_exists(media_info, match_info)
                             over_edition = match_info.get("over_edition")
+                            exist_flag, no_exists = self.subscribe.get_no_exists(media_info, match_info, over_edition)
                             if not over_edition and exist_flag:
                                 # 本地已存在
                                 continue

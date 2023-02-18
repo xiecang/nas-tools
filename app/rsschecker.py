@@ -124,7 +124,7 @@ class RssChecker(object):
         self._scheduler = BackgroundScheduler(timezone=Config().get_timezone(),
                                               executors={
                                                   'default': ThreadPoolExecutor(30)
-                                              })
+        })
         rss_flag = False
         for task in self._rss_tasks:
             if task.get("state") == "Y" and task.get("interval") and str(task.get("interval")).isdigit():
@@ -177,7 +177,6 @@ class RssChecker(object):
             log.info("【RssChecker】%s 获取数据：%s" % (taskinfo.get("name"), len(rss_result)))
         # 处理RSS结果
         res_num = 0
-        no_exists = {}
         for res in rss_result:
             try:
                 # 种子名
@@ -229,26 +228,24 @@ class RssChecker(object):
                                 log.info("【RssChecker】%s 识别为 %s 未匹配到媒体信息" % (title, media_info.get_name()))
                                 continue
                         # 检查是否已存在
+                        no_exists = []
                         if media_info.type == MediaType.MOVIE:
-                            exist_flag, no_exists, _ = self.downloader.check_exists_medias(meta_info=media_info,
-                                                                                           no_exists=no_exists)
+                            exist_flag, no_exists, _ = self.downloader.check_exists_medias(meta_info=media_info)
                             if exist_flag:
                                 log.info("【RssChecker】电影 %s 已存在" % media_info.get_title_string())
                                 continue
                         else:
-                            exist_flag, no_exists, _ = self.downloader.check_exists_medias(meta_info=media_info,
-                                                                                           no_exists=no_exists)
+                            exist_flag, no_exists, _ = self.downloader.check_exists_medias(meta_info=media_info)
                             # 当前剧集已存在，跳过
                             if exist_flag:
                                 # 已全部存在
-                                if not no_exists or not no_exists.get(
-                                        media_info.tmdb_id):
+                                if not no_exists:
                                     log.info("【RssChecker】电视剧 %s %s 已存在" % (
                                         media_info.get_title_string(), media_info.get_season_episode_string()))
                                 continue
-                            if no_exists.get(media_info.tmdb_id):
+                            if no_exists:
                                 log.info("【RssChecker】%s 缺失季集：%s"
-                                         % (media_info.get_title_string(), no_exists.get(media_info.tmdb_id)))
+                                         % (media_info.get_title_string(), no_exists))
                     # 大小及种子页面
                     media_info.set_torrent_info(size=size,
                                                 page_url=page_url,
@@ -566,28 +563,24 @@ class RssChecker(object):
                 media_info.get_season_episode_string()))
         media_info.set_torrent_info(res_order=res_order)
         # 检查是否已存在
-        no_exists = {}
         exist_flag = False
         if not media_info.tmdb_id:
             log.info("【RssChecker】%s 识别为 %s 未匹配到媒体信息" % (title, media_info.get_name()))
         else:
             if media_info.type == MediaType.MOVIE:
-                exist_flag, no_exists, _ = self.downloader.check_exists_medias(meta_info=media_info,
-                                                                               no_exists=no_exists)
+                exist_flag, no_exists, _ = self.downloader.check_exists_medias(meta_info=media_info)
                 if exist_flag:
                     log.info("【RssChecker】电影 %s 已存在" % media_info.get_title_string())
             else:
-                exist_flag, no_exists, _ = self.downloader.check_exists_medias(meta_info=media_info,
-                                                                               no_exists=no_exists)
+                exist_flag, no_exists, _ = self.downloader.check_exists_medias(meta_info=media_info)
                 if exist_flag:
                     # 已全部存在
-                    if not no_exists or not no_exists.get(
-                            media_info.tmdb_id):
+                    if not no_exists:
                         log.info("【RssChecker】电视剧 %s %s 已存在" % (
                             media_info.get_title_string(), media_info.get_season_episode_string()))
-                if no_exists.get(media_info.tmdb_id):
+                if no_exists:
                     log.info("【RssChecker】%s 缺失季集：%s"
-                             % (media_info.get_title_string(), no_exists.get(media_info.tmdb_id)))
+                             % (media_info.get_title_string(), no_exists))
         return media_info, match_flag, exist_flag
 
     def check_rss_articles(self, flag, articles):
