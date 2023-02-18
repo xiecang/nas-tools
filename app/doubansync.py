@@ -109,7 +109,6 @@ class DoubanSync:
                                 search_result = self.searcher.search_one_media(
                                     media_info=media_info,
                                     in_from=SearchType.DB,
-                                    no_exists=no_exists,
                                     user_name=media_info.user_name)
 
                                 if search_result:

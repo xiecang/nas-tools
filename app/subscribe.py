@@ -636,11 +636,8 @@ class Subscribe:
             search_result = self.searcher.search_one_media(
                 media_info=media_info,
                 in_from=SearchType.RSS,
-                no_exists=no_exists,
                 sites=rss_info.get("search_sites"),
                 filters=filter_dict)
-            if not search_result:
-                return
             rss_info['type'] = MediaType.MOVIE
             self.subscribe_media(rss_info, search_result, no_exists)
 
@@ -721,8 +718,6 @@ class Subscribe:
         over_edition = rss_info.get('over_edition')
         type = rss_info.get('type')
         tmdb_id = int(rss_info.get('tmdbid'))
-        if rss_info.get('season'):
-            season = int(str(rss_info.get("season")).replace("S", ""))
         title = rss_info.get('name')
         year = rss_info.get('year')
         if media_list:
