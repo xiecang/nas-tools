@@ -735,7 +735,7 @@ class Downloader:
         :return: 当前媒体是否缺失，各标题总的季集和缺失的季集，需要发送的消息
         """
         if not no_exists:
-            no_exists = {}
+            no_exists = []
         if not total_ep:
             total_ep = {}
         # 查找的季
@@ -801,9 +801,6 @@ class Downloader:
                         if no_exists_episodes:
                             # 排序
                             no_exists_episodes.sort()
-                            # 缺失集初始化
-                            if not no_exists.get(meta_info.tmdb_id):
-                                no_exists[meta_info.tmdb_id] = []
                             # 缺失集提示文本
                             exists_tvs_str = "、".join(["%s" % tv for tv in no_exists_episodes])
                             # 存入总缺失集
@@ -828,8 +825,8 @@ class Downloader:
                                         "%s 第%s季 缺失集：%s" % (meta_info.title, season_number, exists_tvs_str))
                                 else:
                                     message_list.append("第%s季 缺失集：%s" % (season_number, exists_tvs_str))
-                            if no_item not in no_exists.get(meta_info.tmdb_id):
-                                no_exists[meta_info.tmdb_id].append(no_item)
+                            if no_item:
+                                no_exists.append(no_item)
                             # 输入检查集
                             if search_episode:
                                 # 有集数，肯定只有一季
@@ -855,7 +852,7 @@ class Downloader:
                 message_list.append("%s 无法查询到媒体详细信息" % meta_info.get_title_string())
                 return_flag = None
             # 全部存在
-            if return_flag is False and not no_exists.get(meta_info.tmdb_id):
+            if return_flag is False and not no_exists:
                 return_flag = True
             # 返回
             return return_flag, no_exists, message_list
@@ -869,8 +866,8 @@ class Downloader:
                 msg = f"媒体库中已存在电影：\n • {movies_str}"
                 log.info(f"【Downloader】{msg}")
                 message_list.append(msg)
-                return True, {}, message_list
-            return False, {}, message_list
+                return True, [], message_list
+            return False, [], message_list
 
     def set_files_status(self, tid, need_episodes, downloader):
         """
