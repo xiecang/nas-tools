@@ -66,12 +66,6 @@ export class NormalCard extends observeState(CustomElement) {
             <path d="M5 12l5 5l10 -10"></path>
           </svg>
         </div>`;
-    } else if (this.vote && this.vote != "0.0" && this.vote != "0") {
-      return html`
-      <div class="badge badge-pill bg-purple"
-           style="position: absolute; top: 10px; right: 10px">
-        ${this.vote}
-      </div>`;
     } else {
       return nothing;
     }
