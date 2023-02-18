@@ -1384,9 +1384,13 @@
       select_SelectPart(rss_setting.rss_sites, 'rss_sites');
       if (rss_setting.search_sites.length == $(`input[${select_name('rss_search_sites')}][type=checkbox]`).length) {
         $('#rss_search_sites_select_all').text("全不选")
+      } else {
+        $('#rss_search_sites_select_all').text("全选")
       }
       if (rss_setting.rss_sites.length == $(`input[${select_name('rss_sites')}][type=checkbox]`).length) {
         $('#rss_sites_select_all').text("全不选")
+      } else {
+        $('#rss_search_sites_select_all').text("全选")
       }
     } else {
       $("#rss_restype").val('');
@@ -1473,9 +1477,14 @@
         select_SelectPart(ret.detail.search_sites, 'search_sites')
         if (ret.detail.search_sites.length == $(`input[${select_name('rss_search_sites')}][type=checkbox]`).length) {
           $('#rss_search_sites_select_all').text("全不选")
+        } else {
+          $('#rss_search_sites_select_all').text("全选")
+
         }
         if (ret.detail.rss_sites.length == $(`input[${select_name('rss_sites')}][type=checkbox]`).length) {
           $('#rss_sites_select_all').text("全不选")
+        } else {
+          $('#rss_search_sites_select_all').text("全选")
         }
         $("[name='rss_add_btn']").hide();
         $("[name='rss_edit_btn']").show();
