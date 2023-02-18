@@ -2487,8 +2487,18 @@ class DbHelper:
             return
         self._db.query(DOUBANMEDIAS).filter(DOUBANMEDIAS.ID == int(hid)).delete()
 
-    def get_douban_history(self):
+    def get_all_douban_history(self):
+        """
+        查询全部豆瓣同步记录
+        """
+        return self._db.query(DOUBANMEDIAS).order_by(DOUBANMEDIAS.MARK_DATE.desc()).all()
+
+    def get_douban_history(self, rownum=20, page=1):
         """
         查询豆瓣同步记录
         """
-        return self._db.query(DOUBANMEDIAS).order_by(DOUBANMEDIAS.MARK_DATE.desc()).all()
+        if int(page) == 1:
+            begin_pos = 0
+        else:
+            begin_pos = (int(page) - 1) * int(rownum)
+        return self._db.query(DOUBANMEDIAS).order_by(DOUBANMEDIAS.MARK_DATE.desc()).limit(int(rownum)).offset(begin_pos).all()
