@@ -2089,13 +2089,13 @@ class DbHelper:
                 .order_by(RSSHISTORY.FINISH_TIME.desc()).all()
         return self._db.query(RSSHISTORY).order_by(RSSHISTORY.FINISH_TIME.desc()).all()
 
-    def is_exists_rss_history(self, rssid):
+    def is_exists_rss_history(self, rssid, rtype):
         """
         判断RSS历史是否存在
         """
         if not rssid:
             return False
-        count = self._db.query(RSSHISTORY).filter(RSSHISTORY.RSSID == rssid).count()
+        count = self._db.query(RSSHISTORY).filter(RSSHISTORY.RSSID == rssid, RSSHISTORY.TYPE == rtype).count()
         if count > 0:
             return True
         else:
@@ -2106,7 +2106,7 @@ class DbHelper:
         """
         登记RSS历史
         """
-        if not self.is_exists_rss_history(rssid):
+        if not self.is_exists_rss_history(rssid, rtype):
             self._db.insert(RSSHISTORY(
                 TYPE=rtype,
                 RSSID=rssid,
