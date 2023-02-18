@@ -74,6 +74,9 @@ class Searcher:
         """
         if not media_info or sites == []:
             return None
+        if sites == []:
+            log.warn("【Searcher】没有设置用于订阅搜索的站点。")
+            return None
         # 进度计数重置
         self.progress.start('search')
         # 查找的季
