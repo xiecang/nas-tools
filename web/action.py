@@ -4320,7 +4320,7 @@ class WebAction:
         """
         查询豆瓣同步历史
         """
-        results = self.dbhelper.get_douban_history()
+        results = self.dbhelper.get_all_douban_history()
         return {"code": 0, "result": [item.as_dict() for item in results]}
 
     def get_douban_wish(self, page=1):
