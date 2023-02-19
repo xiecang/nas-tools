@@ -1266,7 +1266,7 @@ class FileTransfer:
                 continue
             del_flag, del_msg = self.delete_file_path(rec.DEST_PATH, rec.DEST_FILENAME)
             if not del_flag:
-                log.error(f"【Rmt] {del_msg}")
+                log.error(f"【Rmt】 {del_msg}")
             else:
                 log.info(f"【Rmt】{del_msg}")
                 self.dbhelper.delete_transfer_log_by_id(rec.ID)
