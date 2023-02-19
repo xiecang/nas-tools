@@ -727,7 +727,8 @@ class Subscribe:
                 media_list = [m for m in media_list if m.res_order > res_order]
         else:
             if over_edition:
-                over_edition_media_list = [m for m in media_list if any(int(m.res_order) > int(no_exists['episode_filter_orders'][x]) for x in m.get_episode_list())]
+                over_edition_media_list = [m for m in media_list if any(int(m.res_order) > int(no_exists['episode_filter_orders'][x])
+                                                                        and no_exists['episode_filter_orders'][x] > 0 for x in m.get_episode_list())]
                 over_edition_need_tvs = defaultdict(list)
                 over_edition_need_tvs[tmdb_id].append({
                     'episodes': [e for e, o in no_exists['episode_filter_orders'].items() if int(o) > 0],
@@ -767,8 +768,7 @@ class Subscribe:
             if type == MediaType.MOVIE or not no_exists['episodes']:
                 # 洗版
                 if over_edition:
-                    if self.update_subscribe_over_edition(rtype=type,
-                                                          rss_info=rss_info,
+                    if self.update_subscribe_over_edition(rss_info=rss_info,
                                                           media=max(download_items, key=attrgetter('res_order'))):
                         self.finish_rss_subscribe(rss_info=rss_info)
                         return
