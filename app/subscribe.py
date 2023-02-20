@@ -728,18 +728,20 @@ class Subscribe:
         else:
             if over_edition:
                 over_edition_media_list = [m for m in media_list if any(int(m.res_order) > int(no_exists['episode_filter_orders'][x])
-                                                                        and no_exists['episode_filter_orders'][x] > 0 for x in m.get_episode_list())]
+                                                                        for x in m.get_episode_list() if no_exists['episode_filter_orders'].get(x, 0) > 0)]
                 over_edition_need_tvs = defaultdict(list)
                 over_edition_need_tvs[tmdb_id].append({
                     'episodes': [e for e, o in no_exists['episode_filter_orders'].items() if int(o) > 0],
                     'season': no_exists['season'],
                     'total_episodes': no_exists['total_episodes'],
                 })
+                print(over_edition_need_tvs)
                 download_over_edition_items,  _ = self.downloader.batch_download(in_from=SearchType.RSS,
                                                                                  media_list=over_edition_media_list,
                                                                                  need_tvs=over_edition_need_tvs)
                 if download_over_edition_items:
                     download_items += download_over_edition_items
+            print(download_items)
             need_tvs[tmdb_id].append({
                 'episodes': [e for e in no_exists['episodes']],
                 'season': no_exists['season'],
@@ -752,24 +754,26 @@ class Subscribe:
                                                                          media_list=media_list,
                                                                          need_tvs=need_tvs)
         download_items += download_lacked_items
+        print(download_items)
         if not download_items:
             log.info("【Subscribe】%s 未下载到资源" % title)
         else:
             log.info("【Subscribe】实际下载了 %s 个资源" % len(download_items))
             if type == MediaType.TV:
                 for item in download_items:
-                    no_exists['episode_filter_orders'].update({e: item.res_order for e in item.get_episode_list()})
-                if tmdb_id not in need_tvs:
-                    no_exists['episodes'] = []
-                else:
-                    no_exists['episodes'] = need_tvs[tmdb_id][0]['episodes']
+                    if item.get('season'):
+                        no_exists['episode_filter_orders'].update({e: item.get('item').res_order for e in no_exists['episode_filter_orders']})
+                        no_exists['episodes'] = []
+                    else:
+                        no_exists['episode_filter_orders'].update({e: item.get('item').res_order for e in item.get('episodes')})
+                        no_exists['episodes'] = list(set(no_exists['episodes']).difference(set(item.get('episodes'))))
                 self.update_subscribe_tv_lack(rss_info=rss_info,
                                               seasoninfo=no_exists)
             if type == MediaType.MOVIE or not no_exists['episodes']:
                 # 洗版
                 if over_edition:
                     if self.update_subscribe_over_edition(rss_info=rss_info,
-                                                          media=max(download_items, key=attrgetter('res_order'))):
+                                                          media=max([i['item'] for i in download_items], key=attrgetter('res_order'))):
                         self.finish_rss_subscribe(rss_info=rss_info)
                         return
                 else:
