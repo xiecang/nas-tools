@@ -520,8 +520,6 @@ class Downloader:
                 tag=tag,
                 is_paused=is_paused)
             if state:
-                if download_item not in return_items:
-                    return_items.append(download_item)
                 self.message.send_download_message(in_from, download_item)
             else:
                 self.message.send_download_fail_message(download_item, msg)
@@ -611,6 +609,10 @@ class Downloader:
                                 need_season = __update_seasons(tmdbid=need_tmdbid,
                                                                need=need_season,
                                                                current=item_season)
+                                return_items.append({
+                                    'seasons':  item_season,
+                                    'item': item,
+                                })
 
         # 电视剧季内的集匹配
         if need_tvs:
@@ -631,7 +633,7 @@ class Downloader:
                         if item.type == MediaType.MOVIE:
                             continue
                         if item.tmdb_id == need_tmdbid:
-                            if item in return_items:
+                            if any(x.get('item') == item for x in return_items):
                                 continue
                             item_season = item.get_season_list()
                             if len(item_season) != 1 or item_season[0] != need_season:
@@ -647,6 +649,10 @@ class Downloader:
                                                                       need=need_episodes,
                                                                       seq=index,
                                                                       current=item_episodes)
+                                    return_items.append({
+                                        'episodes':  item_episodes,
+                                        'item': item,
+                                    })
                     index += 1
         # 仍然缺失的剧集，从整季中选择需要的集数文件下载，仅支持QB和TR
         if need_tvs:
@@ -664,7 +670,7 @@ class Downloader:
                     for item in download_list:
                         if item.type == MediaType.MOVIE:
                             continue
-                        if item in return_items:
+                        if any(x.get('item') == item for x in return_items):
                             continue
                         if not need_episodes:
                             break
@@ -690,6 +696,10 @@ class Downloader:
                                              is_paused=True)
                             if not ret:
                                 continue
+                            return_items.append({
+                                'episodes':  selected_episodes,
+                                'item': item,
+                            })
                             # 更新仍需集数
                             need_episodes = __update_episodes(tmdbid=need_tmdbid,
                                                               need=need_episodes,
@@ -719,8 +729,6 @@ class Downloader:
                             # 重新开始任务
                             log.info("【Downloader】%s 开始下载 " % item.org_string)
                             _client.start_torrents(torrent_id)
-                            # 记录下载项
-                            return_items.append(item)
                 index += 1
 
         # 返回下载的资源，剩下没下完的
@@ -1032,7 +1040,7 @@ class Downloader:
         """
         return self._default_client_type
 
-    @staticmethod
+    @ staticmethod
     def __get_client_type(type_name):
         """
         根据名称返回下载器类型
