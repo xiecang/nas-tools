@@ -758,12 +758,12 @@ class Subscribe:
             log.info("【Subscribe】实际下载了 %s 个资源" % len(download_items))
             if type == MediaType.TV:
                 for item in download_items:
-                    if item.get('season'):
+                    if item.get('all'):
                         no_exists['episode_filter_orders'].update({e: item.get('item').res_order for e in no_exists['episode_filter_orders']})
                         no_exists['episodes'] = []
                     else:
-                        no_exists['episode_filter_orders'].update({e: item.get('item').res_order for e in item.get('episodes')})
-                        no_exists['episodes'] = list(set(no_exists['episodes']).difference(set(item.get('episodes'))))
+                        no_exists['episode_filter_orders'].update({e: item.get('item').res_order for e in item.get('selected_episodes')})
+                        no_exists['episodes'] = list(set(no_exists['episodes']).difference(set(item.get('selected_episodes'))))
                 self.update_subscribe_tv_lack(rss_info=rss_info,
                                               seasoninfo=no_exists)
             if type == MediaType.MOVIE or not no_exists['episodes']:

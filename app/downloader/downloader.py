@@ -584,7 +584,7 @@ class Downloader:
                                                                need=need_season,
                                                                current=item_season)
                                 return_items.append({
-                                    'seasons':  item_season,
+                                    'all':  True,
                                     'item': item,
                                 })
 
@@ -624,7 +624,7 @@ class Downloader:
                                                                       seq=index,
                                                                       current=item_episodes)
                                     return_items.append({
-                                        'episodes':  item_episodes,
+                                        'selected_episodes':  item_episodes,
                                         'item': item,
                                     })
                     index += 1
@@ -671,7 +671,7 @@ class Downloader:
                             if not ret:
                                 continue
                             return_items.append({
-                                'episodes':  selected_episodes,
+                                'selected_episodes':  selected_episodes,
                                 'item': item,
                             })
                             # 更新仍需集数
