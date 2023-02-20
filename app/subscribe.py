@@ -735,13 +735,11 @@ class Subscribe:
                     'season': no_exists['season'],
                     'total_episodes': no_exists['total_episodes'],
                 })
-                print(over_edition_need_tvs)
                 download_over_edition_items,  _ = self.downloader.batch_download(in_from=SearchType.RSS,
                                                                                  media_list=over_edition_media_list,
                                                                                  need_tvs=over_edition_need_tvs)
                 if download_over_edition_items:
                     download_items += download_over_edition_items
-            print(download_items)
             need_tvs[tmdb_id].append({
                 'episodes': [e for e in no_exists['episodes']],
                 'season': no_exists['season'],
@@ -750,11 +748,10 @@ class Subscribe:
 
         if not media_list:
             return
-        download_lacked_items, need_tvs = self.downloader.batch_download(in_from=SearchType.RSS,
-                                                                         media_list=media_list,
-                                                                         need_tvs=need_tvs)
+        download_lacked_items, _ = self.downloader.batch_download(in_from=SearchType.RSS,
+                                                                  media_list=media_list,
+                                                                  need_tvs=need_tvs)
         download_items += download_lacked_items
-        print(download_items)
         if not download_items:
             log.info("【Subscribe】%s 未下载到资源" % title)
         else:
