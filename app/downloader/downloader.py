@@ -63,10 +63,12 @@ class Downloader:
         # 下载器配置
         pt = Config().get_config('pt')
         if pt:
-            self._default_client_type = ModuleConf.DOWNLOADER_DICT.get(pt.get('pt_client')) or DownloaderType.QB
+            self._default_client_type = ModuleConf.DOWNLOADER_DICT.get(
+                pt.get('pt_client')) or DownloaderType.QB
             self._pt_monitor_only = pt.get("pt_monitor_only")
             self._download_order = pt.get("download_order")
-            self._pt_rmt_mode = ModuleConf.RMT_MODES.get(pt.get("rmt_mode", "copy"), RmtMode.COPY)
+            self._pt_rmt_mode = ModuleConf.RMT_MODES.get(
+                pt.get("rmt_mode", "copy"), RmtMode.COPY)
         # 下载目录配置
         self._downloaddir = Config().get_config('downloaddir') or []
         # 下载设置
@@ -117,7 +119,8 @@ class Downloader:
             return None
         with client_lock:
             if not self.clients.get(ctype.value):
-                self.clients[ctype.value] = self.__build_class(ctype.value, conf)
+                self.clients[ctype.value] = self.__build_class(
+                    ctype.value, conf)
             return self.clients.get(ctype.value)
 
     def download(self,
@@ -209,14 +212,17 @@ class Downloader:
 
         # 下载设置
         if not download_setting and media_info.site:
-            download_setting = self.sites.get_site_download_setting(media_info.site)
+            download_setting = self.sites.get_site_download_setting(
+                media_info.site)
         if download_setting:
             download_attr = self.get_download_setting(download_setting) \
                 or self.get_download_setting(self.get_default_download_setting())
         else:
-            download_attr = self.get_download_setting(self.get_default_download_setting())
+            download_attr = self.get_download_setting(
+                self.get_default_download_setting())
         # 下载器类型
-        dl_type = self.__get_client_type(download_attr.get("downloader")) or self._default_client_type
+        dl_type = self.__get_client_type(download_attr.get(
+            "downloader")) or self._default_client_type
         # 下载器客户端
         downloader = self.__get_client(dl_type)
 
@@ -266,9 +272,11 @@ class Downloader:
             # 添加下载
             print_url = content if isinstance(content, str) else url
             if is_paused:
-                log.info("【Downloader】添加下载任务并暂停：%s，目录：%s，Url：%s" % (title, download_dir, print_url))
+                log.info("【Downloader】添加下载任务并暂停：%s，目录：%s，Url：%s" %
+                         (title, download_dir, print_url))
             else:
-                log.info("【Downloader】添加下载任务：%s，目录：%s，Url：%s" % (title, download_dir, print_url))
+                log.info("【Downloader】添加下载任务：%s，目录：%s，Url：%s" %
+                         (title, download_dir, print_url))
             if dl_type == DownloaderType.TR:
                 ret = downloader.add_torrent(content,
                                              torrent_hash=torrent_hash,
@@ -315,12 +323,14 @@ class Downloader:
                     visit_dir = self.get_download_visit_dir(download_dir)
                     if visit_dir:
                         if dl_files_folder:
-                            subtitle_dir = os.path.join(visit_dir, dl_files_folder)
+                            subtitle_dir = os.path.join(
+                                visit_dir, dl_files_folder)
                         else:
                             subtitle_dir = visit_dir
                         ThreadHelper().start_thread(
                             Subtitle().download_subtitle_from_site,
-                            (media_info, site_info.get("cookie"), site_info.get("ua"), subtitle_dir)
+                            (media_info, site_info.get("cookie"),
+                             site_info.get("ua"), subtitle_dir)
                         )
                 return ret, ""
             else:
@@ -348,16 +358,20 @@ class Downloader:
                     return
                 for task in trans_tasks:
                     done_flag, done_msg = self.filetransfer.transfer_media(in_from=self._default_client_type,
-                                                                           in_path=task.get("path"),
+                                                                           in_path=task.get(
+                                                                               "path"),
                                                                            rmt_mode=self._pt_rmt_mode)
                     if not done_flag:
-                        log.warn("【Downloader】%s 转移失败：%s" % (task.get("path"), done_msg))
+                        log.warn("【Downloader】%s 转移失败：%s" %
+                                 (task.get("path"), done_msg))
                         self.default_client.set_torrents_status(ids=task.get("id"),
                                                                 tags=task.get("tags"))
                     else:
                         if self._pt_rmt_mode in [RmtMode.MOVE, RmtMode.RCLONE, RmtMode.MINIO]:
-                            log.warn("【Downloader】移动模式下删除种子文件：%s" % task.get("id"))
-                            self.default_client.delete_torrents(delete_file=True, ids=task.get("id"))
+                            log.warn("【Downloader】移动模式下删除种子文件：%s" %
+                                     task.get("id"))
+                            self.default_client.delete_torrents(
+                                delete_file=True, ids=task.get("id"))
                         else:
                             self.default_client.set_torrents_status(ids=task.get("id"),
                                                                     tags=task.get("tags"))
@@ -489,12 +503,13 @@ class Downloader:
                        in_from: SearchType,
                        media_list: list,
                        need_tvs: dict = None,
-                       user_name=None):
+                       user_name=None, res_order=None, over_edition=False):
         """
         根据命中的种子媒体信息，添加下载，由RSS或Searcher调用
         :param in_from: 来源
         :param media_list: 命中并已经识别好的媒体信息列表，包括名称、年份、季、集等信息
-        :param need_tvs: 缺失的剧集清单，对于剧集只有在该清单中的季和集才会下载，对于电影无需输入该参数
+        :param need_tvs: 缺失的剧集清单，对于剧集只有在该清单中的季和集才会下载，对于电影无需输入该参数，
+            示例：{"episode_filter_order": [1:90,2:90:3:92], "season": 1, "tmdb_id": 12345, "over_edition": True, "total_episodes": 10, "res_order": 10}
         :param user_name: 用户名称
         :return: 已经添加了下载的媒体信息表表、剩余未下载到的媒体信息
         """
@@ -525,212 +540,146 @@ class Downloader:
                 self.message.send_download_fail_message(download_item, msg)
             return state
 
-        def __update_seasons(tmdbid, need, current):
-            """
-            更新need_tvs季数
-            """
-            need = list(set(need).difference(set(current)))
-            for cur in current:
-                for nt in need_tvs.get(tmdbid):
-                    if cur == nt.get("season") or (cur == 1 and not nt.get("season")):
-                        need_tvs[tmdbid].remove(nt)
-            if not need_tvs.get(tmdbid):
-                need_tvs.pop(tmdbid)
-            return need
-
-        def __update_episodes(tmdbid, seq, need, current,):
-            """
-            更新need_tvs集数
-            """
-            need = list(set(need).difference(set(current)))
-            need_tvs[tmdbid][seq]["episodes"] = need
-            if need:
-                need_tvs[tmdbid][seq]["episodes"] = need
-            else:
-                need_tvs[tmdbid].pop(seq)
-                if not need_tvs.get(tmdbid):
-                    need_tvs.pop(tmdbid)
-            return need
-
-        def __get_season_episodes(tmdbid, season):
-            """
-            获取需要的季的集数
-            """
-            if not need_tvs.get(tmdbid):
-                return 0
-            for nt in need_tvs.get(tmdbid):
-                if season == nt.get("season"):
-                    return nt.get("total_episodes")
-            return 0
-
         # 下载掉所有的电影
         for item in download_list:
             if item.type == MediaType.MOVIE:
-                __download(item)
+                if over_edition and item.res_order > res_order:
+                    __download(item)
 
-        # 电视剧整季匹配
-        if need_tvs:
+        if not need_tvs:
+            return
+
+        # 处理剧集
+        need_season = need_tvs.get('season')
+        total_episodes = need_tvs.get('total_episodes')
+
+        need_episodes = [e for e, o in need_tvs.get(
+            "episode_filter_orders") if o <= 0 or over_edition]
+        # 电视剧整季匹配，如果缺失一整季
+        if len(need_episodes) == total_episodes:
             # 先把整季缺失的拿出来，看是否刚好有所有季都满足的种子
-            need_seasons = {}
-            for need_tmdbid, need_tv in need_tvs.items():
-                for tv in need_tv:
-                    if not tv:
+            for item in download_list:
+                need_episodes = [e for e, o in need_tvs.get(
+                    "episode_filter_orders") if o <= 0 or over_edition]
+                if not need_episodes:
+                    return
+                tmdb_id = need_tvs.get('tmdb_id')
+                if item.type == MediaType.MOVIE:
+                    continue
+                if item.get_episode_list():
+                    continue
+                if tmdb_id != item.tmdb_id:
+                    continue
+                item_season = item.get_season_list()
+                if over_edition and any(item.res_order <= o for e, o in need_tvs.get("episode_filter_orders")):
+                    continue
+                if len(item_season) == 1:
+                    # 只有一季的可能是命名错误，需要打开种子鉴别，只有实际集数大于等于总集数才下载
+                    torrent_episodes, torrent_path = self.get_torrent_episodes(
+                        url=item.enclosure,
+                        page_url=item.page_url)
+                    if not torrent_episodes \
+                            or len(torrent_episodes) >= total_episodes:
+                        download_state = __download(
+                            download_item=item, torrent_file=torrent_path)
+                    else:
+                        log.info(
+                            f"【Downloader】种子 {item.org_string} 未含集数信息，解析文件数为 {len(torrent_episodes)}")
                         continue
-                    if not tv.get("episodes"):
-                        if not need_seasons.get(need_tmdbid):
-                            need_seasons[need_tmdbid] = []
-                        need_seasons[need_tmdbid].append(tv.get("season") or 1)
-            # 查找整季包含的种子，只处理整季没集的种子或者是集数超过季的种子
-            for need_tmdbid, need_season in need_seasons.items():
-                for item in download_list:
-                    if item.type == MediaType.MOVIE:
-                        continue
-                    item_season = item.get_season_list()
-                    if item.get_episode_list():
-                        continue
-                    if need_tmdbid == item.tmdb_id:
-                        if set(item_season).issubset(set(need_season)):
-                            if len(item_season) == 1:
-                                # 只有一季的可能是命名错误，需要打开种子鉴别，只有实际集数大于等于总集数才下载
-                                torrent_episodes, torrent_path = self.get_torrent_episodes(
-                                    url=item.enclosure,
-                                    page_url=item.page_url)
-                                if not torrent_episodes \
-                                        or len(torrent_episodes) >= __get_season_episodes(need_tmdbid, item_season[0]):
-                                    download_state = __download(download_item=item, torrent_file=torrent_path)
-                                else:
-                                    log.info(
-                                        f"【Downloader】种子 {item.org_string} 未含集数信息，解析文件数为 {len(torrent_episodes)}")
-                                    continue
-                            else:
-                                download_state = __download(item)
-                            if download_state:
-                                # 更新仍需季集
-                                need_season = __update_seasons(tmdbid=need_tmdbid,
-                                                               need=need_season,
-                                                               current=item_season)
-                                return_items.append({
-                                    'all':  True,
-                                    'item': item,
-                                })
+                else:
+                    # 多季的话就都下载了？
+                    download_state = __download(item)
+                if download_state:
+                    # 更新仍需季集
+                    need_tvs['episode_filter_orders'] = {
+                        k: item.res_order for k in need_tvs['episode_filter_orders']}
+                    return_items.append(item)
+                    return return_items
 
         # 电视剧季内的集匹配
-        if need_tvs:
-            need_tv_list = list(need_tvs)
-            for need_tmdbid in need_tv_list:
-                need_tv = need_tvs.get(need_tmdbid)
-                if not need_tv:
-                    continue
-                index = 0
-                for tv in need_tv:
-                    need_season = tv.get("season") or 1
-                    need_episodes = tv.get("episodes")
-                    total_episodes = tv.get("total_episodes")
-                    # 缺失整季的转化为缺失集进行比较
-                    if not need_episodes:
-                        need_episodes = list(range(1, total_episodes + 1))
-                    for item in download_list:
-                        if item.type == MediaType.MOVIE:
-                            continue
-                        if item.tmdb_id == need_tmdbid:
-                            if any(x.get('item') == item for x in return_items):
-                                continue
-                            item_season = item.get_season_list()
-                            if len(item_season) != 1 or item_season[0] != need_season:
-                                continue
-                            item_episodes = item.get_episode_list()
-                            if not item_episodes:
-                                continue
-                            # 只处理单季含集的种子，从集最多的开始下
-                            if set(item_episodes).issubset(set(need_episodes)):
-                                if __download(item):
-                                    # 更新仍需集数
-                                    need_episodes = __update_episodes(tmdbid=need_tmdbid,
-                                                                      need=need_episodes,
-                                                                      seq=index,
-                                                                      current=item_episodes)
-                                    return_items.append({
-                                        'selected_episodes':  item_episodes,
-                                        'item': item,
-                                    })
-                    index += 1
-        # 仍然缺失的剧集，从整季中选择需要的集数文件下载，仅支持QB和TR
-        if need_tvs:
-            need_tv_list = list(need_tvs)
-            for need_tmdbid in need_tv_list:
-                need_tv = need_tvs.get(need_tmdbid)
-                if not need_tv:
-                    continue
-                index = 0
-                for tv in need_tv:
-                    need_season = tv.get("season") or 1
-                    need_episodes = tv.get("episodes")
-                    if not need_episodes:
-                        continue
-                    for item in download_list:
-                        if item.type == MediaType.MOVIE:
-                            continue
-                        if any(x.get('item') == item for x in return_items):
-                            continue
-                        if not need_episodes:
-                            break
-                        # 选中一个单季整季的或单季包括需要的集的
-                        if item.tmdb_id == need_tmdbid \
-                                and (not item.get_episode_list()
-                                     or set(item.get_episode_list()).intersection(set(need_episodes))) \
-                                and len(item.get_season_list()) == 1 \
-                                and item.get_season_list()[0] == need_season:
-                            # 检查种子看是否有需要的集
-                            torrent_episodes, torrent_path = self.get_torrent_episodes(
-                                url=item.enclosure,
-                                page_url=item.page_url)
-                            selected_episodes = set(torrent_episodes).intersection(set(need_episodes))
-                            if not selected_episodes:
-                                log.info("【Downloader】%s 没有需要的集，跳过..." % item.org_string)
-                                continue
-                            # 添加下载并暂停
-                            torrent_tag = "NT" + StringUtils.generate_random_str(5)
-                            ret = __download(download_item=item,
-                                             torrent_file=torrent_path,
-                                             tag=torrent_tag,
-                                             is_paused=True)
-                            if not ret:
-                                continue
-                            return_items.append({
-                                'selected_episodes':  selected_episodes,
-                                'item': item,
-                            })
-                            # 更新仍需集数
-                            need_episodes = __update_episodes(tmdbid=need_tmdbid,
-                                                              need=need_episodes,
-                                                              seq=index,
-                                                              current=selected_episodes)
-                            # 获取下载器
-                            downloader = self._default_client_type
-                            if item.download_setting:
-                                download_attr = self.get_download_setting(item.download_setting)
-                                if download_attr.get("downloader"):
-                                    downloader = self.__get_client_type(download_attr.get("downloader"))
-                            _client = self.__get_client(downloader)
-                            # 获取刚添加的任务ID
-                            if downloader == DownloaderType.TR:
-                                torrent_id = ret.id
-                            elif downloader == DownloaderType.QB:
-                                torrent_id = _client.get_torrent_id_by_tag(tag=torrent_tag, status=["paused"])
-                            else:
-                                continue
-                            if not torrent_id:
-                                log.error("【Downloader】获取下载器添加的任务信息出错：%s，tag=%s" % (
-                                    item.org_string, torrent_tag))
-                                continue
-                            # 设置任务只下载想要的文件
-                            log.info("【Downloader】从 %s 中选取集：%s" % (item.org_string, selected_episodes))
-                            self.set_files_status(torrent_id, selected_episodes, downloader)
-                            # 重新开始任务
-                            log.info("【Downloader】%s 开始下载 " % item.org_string)
-                            _client.start_torrents(torrent_id)
-                index += 1
+        for item in download_list:
+            need_episodes = [e for e, o in need_tvs.get(
+                "episode_filter_orders") if o <= 0 or over_edition]
 
+            if not need_episodes:
+                return
+            item_season = item.get_season_list()
+            if len(item_season) != 1 or item_season[0] != need_season:
+                continue
+            item_episodes = item.get_episode_list()
+            if not item_episodes:
+                continue
+            if over_edition and any(item.res_order <= o for e, o in need_tvs.get("episode_filter_orders")):
+                continue
+            if set(item_episodes).issubset(set(need_episodes)):
+                if __download(item):
+                    need_tvs['episode_filter_orders'].update(
+                        {k: item.res_order for k in item_episodes})
+                    return_items.append(item)
+
+        for item in download_list:
+            need_episodes = [e for e, o in need_tvs.get(
+                "episode_filter_orders") if o <= 0 or over_edition]
+            if not need_episodes:
+                return
+            if len(item_season) != 1 or item_season[0] != need_season:
+                continue
+            item_episodes = item.get_episode_list()
+            if not item_episodes:
+                continue
+            torrent_episodes, torrent_path = self.get_torrent_episodes(
+                url=item.enclosure,
+                page_url=item.page_url)
+            selected_episodes = set(
+                torrent_episodes).intersection(set(need_episodes))
+            if over_edition:
+                selected_episodes = [
+                    e for e in selected_episodes if need_tvs['episode_filter_orders'].get(e, 0) < item.res]
+            if not selected_episodes:
+                log.info("【Downloader】%s 没有需要的集，跳过..." %
+                         item.org_string)
+                continue
+                # 添加下载并暂停
+            torrent_tag = "NT" + \
+                StringUtils.generate_random_str(5)
+            ret = __download(download_item=item,
+                             torrent_file=torrent_path,
+                             tag=torrent_tag,
+                             is_paused=True)
+            if not ret:
+                continue
+            need_tvs['episode_filter_orders'].update(
+                {k: item.res_order for k in selected_episodes})
+            return_items.append(item)
+            # 获取下载器
+            downloader = self._default_client_type
+            if item.download_setting:
+                download_attr = self.get_download_setting(
+                    item.download_setting)
+                if download_attr.get("downloader"):
+                    downloader = self.__get_client_type(
+                        download_attr.get("downloader"))
+            _client = self.__get_client(downloader)
+            # 获取刚添加的任务ID
+            if downloader == DownloaderType.TR:
+                torrent_id = ret.id
+            elif downloader == DownloaderType.QB:
+                torrent_id = _client.get_torrent_id_by_tag(
+                    tag=torrent_tag, status=["paused"])
+            else:
+                continue
+            if not torrent_id:
+                log.error("【Downloader】获取下载器添加的任务信息出错：%s，tag=%s" % (
+                    item.org_string, torrent_tag))
+                continue
+            # 设置任务只下载想要的文件
+            log.info("【Downloader】从 %s 中选取集：%s" %
+                     (item.org_string, selected_episodes))
+            self.set_files_status(
+                torrent_id, selected_episodes, downloader)
+            # 重新开始任务
+            log.info("【Downloader】%s 开始下载 " % item.org_string)
+            _client.start_torrents(torrent_id)
         # 返回下载的资源，剩下没下完的
         return return_items, need_tvs
 
@@ -762,7 +711,8 @@ class Downloader:
             # 是否存在的标志
             return_flag = False
             # 检索电视剧的信息
-            tv_info = self.media.get_tmdb_info(mtype=MediaType.TV, tmdbid=meta_info.tmdb_id)
+            tv_info = self.media.get_tmdb_info(
+                mtype=MediaType.TV, tmdbid=meta_info.tmdb_id)
             if tv_info:
                 # 传入检查季
                 total_seasons = []
@@ -771,17 +721,22 @@ class Downloader:
                         if total_ep.get(season):
                             episode_num = total_ep.get(season)
                         else:
-                            episode_num = self.media.get_tmdb_season_episodes_num(tv_info=tv_info, season=season)
+                            episode_num = self.media.get_tmdb_season_episodes_num(
+                                tv_info=tv_info, season=season)
                         if not episode_num:
-                            log.info("【Downloader】%s 第%s季 不存在" % (meta_info.get_title_string(), season))
-                            message_list.append("%s 第%s季 不存在" % (meta_info.get_title_string(), season))
+                            log.info("【Downloader】%s 第%s季 不存在" %
+                                     (meta_info.get_title_string(), season))
+                            message_list.append("%s 第%s季 不存在" % (
+                                meta_info.get_title_string(), season))
                             continue
-                        total_seasons.append({"season_number": season, "episode_count": episode_num})
+                        total_seasons.append(
+                            {"season_number": season, "episode_count": episode_num})
                         log.info(
                             "【Downloader】%s 第%s季 共有 %s 集" % (meta_info.get_title_string(), season, episode_num))
                 else:
                     # 共有多少季，每季有多少季
-                    total_seasons = self.media.get_tmdb_tv_seasons(tv_info=tv_info)
+                    total_seasons = self.media.get_tmdb_tv_seasons(
+                        tv_info=tv_info)
                     log.info(
                         "【Downloader】%s %s 共有 %s 季" % (
                             meta_info.type.value, meta_info.get_title_string(), len(total_seasons)))
@@ -810,10 +765,12 @@ class Downloader:
                             # 排序
                             no_exists_episodes.sort()
                             # 缺失集提示文本
-                            exists_tvs_str = "、".join(["%s" % tv for tv in no_exists_episodes])
+                            exists_tvs_str = "、".join(
+                                ["%s" % tv for tv in no_exists_episodes])
                             # 存入总缺失集
                             if len(no_exists_episodes) >= episode_count:
-                                no_item = {"season": season_number, "episodes": [], "total_episodes": episode_count}
+                                no_item = {"season": season_number, "episodes": [
+                                ], "total_episodes": episode_count}
                                 log.info(
                                     "【Downloader】%s 第%s季 缺失 %s 集" % (
                                         meta_info.get_title_string(), season_number, episode_count))
@@ -821,7 +778,8 @@ class Downloader:
                                     message_list.append(
                                         "%s 第%s季 缺失 %s 集" % (meta_info.title, season_number, episode_count))
                                 else:
-                                    message_list.append("第%s季 缺失 %s 集" % (season_number, episode_count))
+                                    message_list.append("第%s季 缺失 %s 集" % (
+                                        season_number, episode_count))
                             else:
                                 no_item = {"season": season_number, "episodes": no_exists_episodes,
                                            "total_episodes": episode_count}
@@ -832,7 +790,8 @@ class Downloader:
                                     message_list.append(
                                         "%s 第%s季 缺失集：%s" % (meta_info.title, season_number, exists_tvs_str))
                                 else:
-                                    message_list.append("第%s季 缺失集：%s" % (season_number, exists_tvs_str))
+                                    message_list.append("第%s季 缺失集：%s" % (
+                                        season_number, exists_tvs_str))
                             if no_item:
                                 no_exists.append(no_item)
                             # 输入检查集
@@ -856,8 +815,10 @@ class Downloader:
                                 message_list.append(
                                     "第%s季 共%s集 已全部存在" % (season_number, episode_count))
             else:
-                log.info("【Downloader】%s 无法查询到媒体详细信息" % meta_info.get_title_string())
-                message_list.append("%s 无法查询到媒体详细信息" % meta_info.get_title_string())
+                log.info("【Downloader】%s 无法查询到媒体详细信息" %
+                         meta_info.get_title_string())
+                message_list.append("%s 无法查询到媒体详细信息" %
+                                    meta_info.get_title_string())
                 return_flag = None
             # 全部存在
             if return_flag is False and not no_exists:
@@ -866,11 +827,14 @@ class Downloader:
             return return_flag, no_exists, message_list
         # 检查电影
         else:
-            exists_movies = self.mediaserver.get_movies(meta_info.title, meta_info.year)
+            exists_movies = self.mediaserver.get_movies(
+                meta_info.title, meta_info.year)
             if exists_movies is None:
-                exists_movies = self.filetransfer.get_no_exists_medias(meta_info)
+                exists_movies = self.filetransfer.get_no_exists_medias(
+                    meta_info)
             if exists_movies:
-                movies_str = "\n • ".join(["%s (%s)" % (m.get('title'), m.get('year')) for m in exists_movies])
+                movies_str = "\n • ".join(
+                    ["%s (%s)" % (m.get('title'), m.get('year')) for m in exists_movies])
                 msg = f"媒体库中已存在电影：\n • {movies_str}"
                 log.info(f"【Downloader】{msg}")
                 message_list.append(msg)
@@ -897,13 +861,17 @@ class Downloader:
                 if not meta_info.get_episode_list():
                     selected = False
                 else:
-                    selected = set(meta_info.get_episode_list()).issubset(set(need_episodes))
+                    selected = set(meta_info.get_episode_list()
+                                   ).issubset(set(need_episodes))
                     if selected:
-                        sucess_epidised = list(set(sucess_epidised).union(set(meta_info.get_episode_list())))
+                        sucess_epidised = list(set(sucess_epidised).union(
+                            set(meta_info.get_episode_list())))
                 if not files_info.get(tid):
-                    files_info[tid] = {file_id: {'priority': 'normal', 'selected': selected}}
+                    files_info[tid] = {
+                        file_id: {'priority': 'normal', 'selected': selected}}
                 else:
-                    files_info[tid][file_id] = {'priority': 'normal', 'selected': selected}
+                    files_info[tid][file_id] = {
+                        'priority': 'normal', 'selected': selected}
             if sucess_epidised and files_info:
                 _client.set_files(file_info=files_info)
         elif downloader == DownloaderType.QB:
@@ -917,9 +885,11 @@ class Downloader:
                         set(need_episodes)):
                     file_ids.append(torrent_file.get("index"))
                 else:
-                    sucess_epidised = list(set(sucess_epidised).union(set(meta_info.get_episode_list())))
+                    sucess_epidised = list(set(sucess_epidised).union(
+                        set(meta_info.get_episode_list())))
             if sucess_epidised and file_ids:
-                _client.set_files(torrent_hash=tid, file_ids=file_ids, priority=0)
+                _client.set_files(torrent_hash=tid,
+                                  file_ids=file_ids, priority=0)
         return sucess_epidised
 
     def get_download_list(self, media_list):
@@ -949,7 +919,8 @@ class Downloader:
 
         # 匹配的资源中排序分组选最好的一个下载
         # 按站点顺序、资源匹配顺序、做种人数下载数逆序排序
-        media_list = sorted(media_list, key=lambda x: get_sort_str(x), reverse=True)
+        media_list = sorted(
+            media_list, key=lambda x: get_sort_str(x), reverse=True)
         # 控重
         can_download_list_item = []
         can_download_list = []
@@ -988,7 +959,8 @@ class Downloader:
                 and Config().get_config("qbittorrent").get("auto_management"):
             return []
         # 查询目录
-        save_path_list = [attr.get("save_path") for attr in self._downloaddir if attr.get("save_path")]
+        save_path_list = [attr.get("save_path")
+                          for attr in self._downloaddir if attr.get("save_path")]
         save_path_list.sort()
         return list(set(save_path_list))
 
@@ -1093,7 +1065,8 @@ class Downloader:
         获取默认下载设置
         :return: 默认下载设置id
         """
-        default_download_setting = SystemConfig().get_system_config("DefaultDownloadSetting") or "-1"
+        default_download_setting = SystemConfig().get_system_config(
+            "DefaultDownloadSetting") or "-1"
         if not self._download_setting.get(default_download_setting):
             default_download_setting = "-1"
         return default_download_setting
@@ -1115,58 +1088,5 @@ class Downloader:
         except Exception as err:
             ExceptionUtils.exception_traceback(err)
             upload_limit = 0
-        _client.set_speed_limit(download_limit=download_limit, upload_limit=upload_limit)
-
-    def download_media(self,
-                       in_from: SearchType,
-                       no_exists: dict,
-                       media_info,
-                       media_list: list,
-                       user_name=None):
-
-        # 择优下载
-        download_items = []
-        if media_info.over_edition and media_info.type == MediaType.TV:
-            over_media_info = [x for x in no_exists[media_info.tmdb_id] if x['season'] == int(media_info.get_season_seq())][0]
-            over_edition_media_list = [m for m in media_list if any(int(m.res_order) > int(over_media_info['episode_filter_orders'][x]) for x in m.get_episode_list())]
-            over_edition_need_tvs = defaultdict(list)
-            for k, v in no_exists.items():
-                for v2 in v:
-                    over_edition_need_tvs[k].append({
-                        'episodes': [e for e, o in v2['episode_filter_orders'].items() if int(o) > 0],
-                        'season': v2['season'],
-                        'total_episodes': v2['total_episodes'],
-                    })
-            print(over_edition_need_tvs)
-            download_over_edition_items,  _ = self.batch_download(in_from=in_from,
-                                                                  media_list=over_edition_media_list,
-                                                                  need_tvs=over_edition_need_tvs,
-                                                                  user_name=user_name)
-            if download_over_edition_items:
-                download_items += download_over_edition_items
-
-        print(no_exists)
-        download_lacked_items, left_medias = self.batch_download(in_from=in_from,
-                                                                 media_list=media_list,
-                                                                 need_tvs=no_exists,
-                                                                 user_name=user_name)
-        download_items += download_lacked_items
-        # 统计下载情况，下全了返回True，没下全返回False
-        if not download_items:
-            log.info("【Searcher】%s 未下载到资源" % media_info.title)
-            return None, no_exists
-        else:
-            log.info("【Searcher】实际下载了 %s 个资源" % len(download_items))
-            for item in download_items:
-                season_item = [x for x in no_exists[media_info.tmdb_id] if x['season'] == int(media_info.get_season_seq())][0]
-                no_exists[media_info.tmdb_id][no_exists[media_info.tmdb_id].index(season_item)]['episode_filter_orders'].update({e: item.res_order for e in item.get_episode_list()})
-            print(no_exists)
-            # 还有剩下的缺失，说明没下完，返回False
-            if left_medias:
-                for tmdbid, v in no_exists.items():
-                    for index, _ in enumerate(v):
-                        if tmdbid not in left_medias:
-                            no_exists[tmdbid][index]['episodes'] = []
-                        else:
-                            no_exists[tmdbid][index]['episodes'] = left_medias[tmdbid][index]['episodes']
-            return download_items, no_exists
+        _client.set_speed_limit(
+            download_limit=download_limit, upload_limit=upload_limit)
