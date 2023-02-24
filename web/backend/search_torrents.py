@@ -436,11 +436,18 @@ def __search_media(in_from, media_info, user_id, user_name=None):
         Message().send_channel_msg(channel=in_from,
                                    title="%s 未搜索到任何资源" % media_info.title,
                                    user_id=user_id)
+        return
+    if need_tvs:
+        need_tvs = need_tvs[0]
+        need_tvs['episode_filter_orders'].update({e: 0 for e in need_tvs['episodes']})
+        need_tvs['episode_filter_orders'].update({e: 1 for e, o in need_tvs['episode_filter_orders'].items() if o == 0 and e not in need_tvs['episodes']})
     if Config().get_config("pt").get('search_auto', True):
+
         download_result, no_exists = Downloader().batch_download(
             in_from=in_from,
             media_list=search_result,
-            need_tvs={media_info.tmdb_id: need_tvs},
+            need_tvs=need_tvs,
+            tmdb_id=media_info.tmdb_id,
             user_name=user_name)
         if not download_result:
             # 搜索到了但是没下载到数据

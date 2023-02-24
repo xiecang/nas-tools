@@ -985,18 +985,15 @@ class DbHelper:
         return 0
 
     @DbPersist(_db)
-    def update_rss_tv_lack(self, title=None, year=None, season=None, rssid=None, lack_episodes: list = None, episode_filter_orders: dict = None):
+    def update_rss_tv_lack(self, title=None, year=None, season=None, rssid=None, episode_filter_orders: dict = None):
         """
         更新电视剧缺失的集数
         """
         if not title and not rssid:
             return
-        if not lack_episodes:
-            lack = 0
-        else:
-            lack = len(lack_episodes)
+        lack = len([e for e, o in episode_filter_orders.items() if o == 0])
         if rssid:
-            self.update_rss_tv_episodes(rssid, lack_episodes, episode_filter_orders)
+            self.update_rss_tv_episodes(rssid, episode_filter_orders)
             self._db.query(RSSTVS).filter(RSSTVS.ID == int(rssid)).update(
                 {
                     "LACK": lack
@@ -1038,28 +1035,22 @@ class DbHelper:
             return False
 
     @DbPersist(_db)
-    def update_rss_tv_episodes(self, rid, episodes: list, episode_filter_orders: dict):
+    def update_rss_tv_episodes(self, rid, episode_filter_orders: dict):
         """
         插入或更新电视剧订阅缺失剧集
         """
         if not rid:
             return
-        if not episodes:
-            episodes = []
-        else:
-            episodes = [str(epi) for epi in episodes]
         if self.is_exists_rss_tv_episodes(rid):
             self._db.query(RSSTVEPISODES).filter(RSSTVEPISODES.RSSID == int(rid)).update(
                 {
                     "EPISODE_FILTER_ORDERS": ",".join([f'{key}:{value}' for key, value in episode_filter_orders.items()]),
-                    "EPISODES": ",".join(episodes),
                 }
             )
         else:
             self._db.insert(RSSTVEPISODES(
                 RSSID=rid,
                 EPISODE_FILTER_ORDERS=",".join([f'{key}:{value}' for key, value in episode_filter_orders.items()]),
-                EPISODES=",".join(episodes),
             ))
 
     def get_rss_tv_episodes(self, rid):
@@ -2101,13 +2092,13 @@ class DbHelper:
                 .order_by(RSSHISTORY.FINISH_TIME.desc()).all()
         return self._db.query(RSSHISTORY).order_by(RSSHISTORY.FINISH_TIME.desc()).all()
 
-    def is_exists_rss_history(self, rssid, rtype):
+    def is_exists_rss_history(self, tmdbid):
         """
         判断RSS历史是否存在
         """
-        if not rssid:
+        if not tmdbid:
             return False
-        count = self._db.query(RSSHISTORY).filter(RSSHISTORY.RSSID == rssid, RSSHISTORY.TYPE == rtype).count()
+        count = self._db.query(RSSHISTORY).filter(RSSHISTORY.TMDBID == tmdbid).count()
         if count > 0:
             return True
         else:
@@ -2118,7 +2109,7 @@ class DbHelper:
         """
         登记RSS历史
         """
-        if not self.is_exists_rss_history(rssid, rtype):
+        if not self.is_exists_rss_history(tmdbid):
             self._db.insert(RSSHISTORY(
                 TYPE=rtype,
                 RSSID=rssid,
