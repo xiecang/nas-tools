@@ -500,6 +500,7 @@ class Downloader:
             return _client.delete_torrents(delete_file=delete_file, ids=ids)
 
     def batch_download(self,
+                       type: MediaType,
                        in_from: SearchType,
                        media_list: list,
                        tmdb_id: int,
@@ -542,10 +543,18 @@ class Downloader:
             return torrent_id
 
         # 下载掉所有的电影
-        for item in download_list:
-            if item.type == MediaType.MOVIE:
-                if over_edition and item.res_order > res_order:
-                    __download(item)
+        if type == MediaType.MOVIE:
+            for item in download_list:
+                if item.type == MediaType.TV:
+                    continue
+                if over_edition:
+                    if item.res_order > res_order and __download(item):
+                        return_items.append(item)
+                        break
+                elif __download(item):
+                    return_items.append(item)
+                    break
+            return return_items, {}
 
         if not need_tvs:
             return

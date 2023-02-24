@@ -444,6 +444,7 @@ def __search_media(in_from, media_info, user_id, user_name=None):
     if Config().get_config("pt").get('search_auto', True):
 
         download_result, no_exists = Downloader().batch_download(
+            type=media_info.type,
             in_from=in_from,
             media_list=search_result,
             need_tvs=need_tvs,
