@@ -111,11 +111,16 @@ class DoubanSync:
                                     in_from=SearchType.DB,
                                     user_name=media_info.user_name)
 
+                                if need_tvs:
+                                    need_tvs = need_tvs[0]
+                                    need_tvs['episode_filter_orders'].update({e: 0 for e in need_tvs['episodes']})
+                                    need_tvs['episode_filter_orders'].update({e: 1 for e, o in need_tvs['episode_filter_orders'].items() if o == 0 and e not in need_tvs['episodes']})
                                 if search_result:
                                     _, no_exists = self.downloader.batch_download(
                                         in_from=SearchType.DB,
                                         media_list=search_result,
-                                        need_tvs={media_info.tmdb_id: need_tvs},
+                                        tmdb_id=media_info.tmdb_id,
+                                        need_tvs=need_tvs,
                                         user_name=media_info.user_name)
                                     if not no_exists.get(media_info.tmdb_id):
                                         # 下载全了更新为已下载，没下载全的下次同步再次搜索
