@@ -66,6 +66,12 @@ LoginManager.init_app(App)
 App.register_blueprint(apiv1_bp, url_prefix="/api/v1")
 
 
+@App.errorhandler(Exception)
+def handle_error(e):
+    log.debug("【Exception】处理请求时发生异常：" + "".join(traceback.format_exception(e)))
+    return {}
+
+
 @App.after_request
 def add_header(r):
     """
