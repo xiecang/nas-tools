@@ -601,6 +601,8 @@ class Subscribe:
             self.subscribe_search_movie(state=state)
             # 处理电视剧
             self.subscribe_search_tv(state=state)
+        except:
+            raise
         finally:
             lock.release()
 

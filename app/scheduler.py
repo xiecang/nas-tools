@@ -5,6 +5,8 @@ import traceback
 
 from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.events import EVENT_JOB_ERROR
+
 
 import log
 from app.doubansync import DoubanSync
@@ -45,7 +47,7 @@ class Scheduler:
         self.SCHEDULER = BackgroundScheduler(timezone=Config().get_timezone(),
                                              executors={
                                                  'default': ThreadPoolExecutor(20)
-                                             })
+        })
         if not self.SCHEDULER:
             return
         if self._pt:
@@ -203,7 +205,12 @@ class Scheduler:
 
         self.SCHEDULER.print_jobs()
 
+        self.SCHEDULER.add_listener(self.listener, EVENT_JOB_ERROR)
+
         self.SCHEDULER.start()
+
+    def listener(self, event):
+        log.debug("【Exception】定时任务执行异常，错误: " + "".join(traceback.format_exception(event.exception)))
 
     def stop_service(self):
         """
