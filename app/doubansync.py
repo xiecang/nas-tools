@@ -117,6 +117,7 @@ class DoubanSync:
                                     need_tvs['episode_filter_orders'].update({e: 1 for e, o in need_tvs['episode_filter_orders'].items() if o == 0 and e not in need_tvs['episodes']})
                                 if search_result:
                                     _, no_exists = self.downloader.batch_download(
+                                        media_info.type,
                                         in_from=SearchType.DB,
                                         media_list=search_result,
                                         tmdb_id=media_info.tmdb_id,
