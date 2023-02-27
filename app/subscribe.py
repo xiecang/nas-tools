@@ -765,7 +765,7 @@ class Subscribe:
         if type == MediaType.MOVIE:
             if not download_items:
                 return
-            log.info("【Subscribe】更新电影 %s，当前版本优先级Index为 %" % (title, download_items[0].res_order))
+            log.info("【Subscribe】更新电影 %s，当前版本优先级Index为 %s" % (title, download_items[0].res_order))
             if not over_edition or self.update_subscribe_over_edition(rss_info=rss_info,
                                                                       type=type, res_order=max(download_items, key=lambda x: x.res_order).res_order):
                 self.finish_rss_subscribe(rss_info=rss_info)
@@ -838,6 +838,7 @@ class Subscribe:
         获取媒体信息的存在情况
         """
         exist_flag = False
+        rss_no_exists = {}
         if media_info.type == MediaType.MOVIE:
             exist_flag, _, _ = self.downloader.check_exists_medias(
                 meta_info=media_info,
