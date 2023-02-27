@@ -310,8 +310,7 @@ class RssChecker(object):
                 else:
                     continue
             except Exception as e:
-                ExceptionUtils.exception_traceback(e)
-                log.error("【RssChecker】处理RSS发生错误：%s - %s" % (str(e), traceback.format_exc()))
+                log.error("【Rss】处理RSS发生错误：" + "".join(traceback.format_exception(e)))
                 continue
         log.info("【RssChecker】%s 处理结束，匹配到 %s 个有效资源" % (taskinfo.get("name"), res_num))
         # 添加下载

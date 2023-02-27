@@ -1,5 +1,6 @@
 import re
 import xml.dom.minidom
+import traceback
 from threading import Lock
 
 import log
@@ -224,8 +225,7 @@ class Rss:
                         res_num = res_num + 1
                         total_num += 1
                     except Exception as e:
-                        ExceptionUtils.exception_traceback(e)
-                        log.error("【Rss】处理RSS发生错误：%s" % str(e))
+                        log.error("【Rss】处理RSS发生错误：" + "".join(traceback.format_exception(e)))
                         continue
                 log.info("【Rss】%s 处理结束，匹配到 %s 个有效资源" % (site_name, res_num))
             log.info("【Rss】所有RSS处理结束，共 %s 个有效资源" % total_num)

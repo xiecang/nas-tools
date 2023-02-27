@@ -52,7 +52,7 @@ class Logger:
                     os.makedirs(logpath)
                 log_file_handler = RotatingFileHandler(filename=os.path.join(logpath, module + ".txt"),
                                                        maxBytes=5 * 1024 * 1024,
-                                                       backupCount=3,
+                                                       backupCount=30,
                                                        encoding='utf-8')
                 log_file_handler.setFormatter(logging.Formatter('%(asctime)s\t%(levelname)s: %(message)s'))
                 self.logger.addHandler(log_file_handler)
