@@ -969,8 +969,6 @@ class Downloader:
                              is_paused=True)
             if not ret:
                 continue
-            need_tvs['episode_filter_orders'].update(
-                {k: item.res_order for k in selected_episodes})
             return_items.append(item)
             # 获取下载器
             downloader = self._default_client_type
@@ -987,16 +985,18 @@ class Downloader:
                     item.org_string, torrent_tag))
                 continue
             # 设置任务只下载想要的文件
-            log.info("【Downloader】从 %s 中选取集：%s, torrent id: %s" %
-                     (item.org_string, selected_episodes, torrent_id))
+            log.info("【Downloader】从 %s 中选取集：%s, torrent id: %s, downloader: %s" %
+                     (item.org_string, selected_episodes, torrent_id, downloader))
             select_succeed = self.set_files_status(
                 torrent_id, selected_episodes, downloader)
             if select_succeed:
                 # 重新开始任务
                 log.info("【Downloader】%s 开始下载 " % item.org_string)
                 _client.start_torrents(torrent_id)
+                need_tvs['episode_filter_orders'].update(
+                    {k: item.res_order for k in selected_episodes})
             else:
-                print(select_succeed)
+                log.info("【Downloader】%s选集失败" % item.org_string)
         # 返回下载的资源，剩下没下完的
         return return_items, need_tvs
 
