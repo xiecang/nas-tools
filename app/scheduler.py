@@ -221,7 +221,7 @@ class Scheduler:
         重启定时服务
         """
         self.stop_service()
-        self.start_service()
+        self.run_service()
 
     def start_data_site_signin_job(self, hour, minute):
         year = datetime.datetime.now().year

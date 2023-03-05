@@ -2,6 +2,7 @@ from app.mediaserver import MediaServer
 from app.plugins import EventHandler
 from app.plugins.modules._base import _IPluginModule
 from app.utils.types import EventType
+import log
 
 
 class LibraryRefresh(_IPluginModule):
@@ -62,12 +63,13 @@ class LibraryRefresh(_IPluginModule):
         pass
 
     @EventHandler.register([
-            EventType.TransferFinished,
-            EventType.LibraryFileDeleted])
+        EventType.TransferFinished,
+        EventType.LibraryFileDeleted])
     def refresh(self, event):
         """
         监听入库完成事件
         """
+        log.info("接收到刷新媒体库消息.")
         if not self._enable:
             return
         media_info = event.event_data.get("media_info")

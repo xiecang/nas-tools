@@ -375,6 +375,9 @@ class Qbittorrent(_IDownloadClient):
         else:
             seeding_time_limit = None
         try:
+            exist, _ = self.get_torrents(ids=[torrent_hash])
+            if len(exist) > 0:
+                return True
             if self._torrent_management:
                 save_path = None
             qbc_ret = self.qbc.torrents_add(urls=urls,
@@ -524,11 +527,11 @@ class Qbittorrent(_IDownloadClient):
             })
         return DispTorrents
 
-    def get_completed_progress(self, tag=None):
+    def get_completed_progress(self, tag=None, ids=None):
         """
         获取已完成的种子进度
         """
-        Torrents = self.get_completed_torrents(tag=tag)
+        Torrents = self.get_completed_torrents(tag=tag, ids=ids) or []
         DispTorrents = []
         for torrent in Torrents:
             # 进度

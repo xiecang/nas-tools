@@ -3,7 +3,8 @@ import os.path
 import re
 from urllib.parse import unquote
 
-from bencode import bdecode
+from bencode import bdecode, bencode
+import hashlib
 
 from app.utils.http_utils import RequestUtils
 from app.utils.types import MediaType
@@ -29,9 +30,9 @@ class Torrent:
         :return: 种子Hash、种子保存路径、种子内容、种子文件列表主目录、种子文件列表、错误信息
         """
         if not url:
-            return None, None, "", [], "URL为空"
+            return "", None, None, "", [], "URL为空"
         if url.startswith("magnet:"):
-            return None, url, "", [], f"{url} 为磁力链接"
+            return "", None, url, "", [], f"{url} 为磁力链接"
         try:
             # 下载保存种子文件
             file_path, content, errmsg = self.save_torrent_file(url=url,
@@ -47,7 +48,7 @@ class Torrent:
             return hash, file_path, content, files_folder, files, retmsg
 
         except Exception as err:
-            return None, None, "", [], "下载种子文件出现异常：%s" % str(err)
+            return "", None, None, "", [], "下载种子文件出现异常：%s" % str(err)
 
     def save_torrent_file(self, url, cookie=None, ua=None, referer=None, proxy=False):
         """
@@ -123,6 +124,13 @@ class Torrent:
         except Exception as err:
             return hash, file_folder, file_names, "解析种子文件异常：%s" % str(err)
         return hash, file_folder, file_names, ""
+
+    @staticmethod
+    def convert_magnet_to_hash(magnet):
+        ret = re.findall(r"magnet:\?xt=urn:btih:([0-9A-Fa-f]+)&dn", magnet)
+        if len(ret) > 0:
+            return ret[0].lower()
+        return None
 
     def read_torrent_content(self, path):
         """

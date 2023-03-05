@@ -520,6 +520,38 @@ class Transmission(_IDownloadClient):
             })
         return DispTorrents
 
+    def get_completed_progress(self, tag=None, ids=None):
+        """
+        获取正在下载的种子进度
+        """
+        Torrents = self.get_completed_torrents(tag=tag, ids=ids) or []
+        DispTorrents = []
+        for torrent in Torrents:
+            if torrent.status in ['stopped']:
+                state = "Stoped"
+                speed = "已暂停"
+            else:
+                state = "Downloading"
+                if hasattr(torrent, "rate_download"):
+                    _dlspeed = StringUtils.str_filesize(torrent.rate_download)
+                else:
+                    _dlspeed = StringUtils.str_filesize(torrent.rateDownload)
+                if hasattr(torrent, "rate_upload"):
+                    _upspeed = StringUtils.str_filesize(torrent.rate_upload)
+                else:
+                    _upspeed = StringUtils.str_filesize(torrent.rateUpload)
+                speed = "%s%sB/s %s%sB/s" % (chr(8595), _dlspeed, chr(8593), _upspeed)
+            # 进度
+            progress = round(torrent.progress)
+            DispTorrents.append({
+                'id': torrent.id,
+                'name': torrent.name,
+                'speed': speed,
+                'state': state,
+                'progress': progress
+            })
+        return DispTorrents
+
     def set_speed_limit(self, download_limit=None, upload_limit=None):
         """
         设置速度限制

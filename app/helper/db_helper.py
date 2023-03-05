@@ -1628,9 +1628,8 @@ class DbHelper:
             )
         else:
             self._db.insert(DOWNLOADHISTORY(
-                TITLE=title,
+                TITLE=media_info.title,
                 YEAR=media_info.year,
-                TORRENT_HASH=torrent_hash,
                 TYPE=media_info.type.value,
                 TMDBID=media_info.tmdb_id,
                 VOTE=media_info.vote_average,
@@ -1655,7 +1654,7 @@ class DbHelper:
             return self._db.query(DOWNLOADHISTORY).filter(
                 DOWNLOADHISTORY.DATE > date).order_by(DOWNLOADHISTORY.DATE.desc()).all()
         elif hash:
-            return self._db.query(DOWNLOADHISTORY).filter(DOWNLOADHISTORY.TORRENT_HASH.in_(hash)).all()
+            return self._db.query(DOWNLOADHISTORY).filter(DOWNLOADHISTORY.DOWNLOAD_ID.in_(hash)).all()
         else:
             offset = (int(page) - 1) * int(num)
             return self._db.query(DOWNLOADHISTORY).order_by(
@@ -2535,7 +2534,11 @@ class DbHelper:
         """
         查询豆瓣同步记录
         """
-        return self._db.query(DOUBANMEDIAS).order_by(DOUBANMEDIAS.ADD_TIME.desc()).all()
+        if int(page) == 1:
+            begin_pos = 0
+        else:
+            begin_pos = (int(page) - 1) * int(rownum)
+        return self._db.query(DOUBANMEDIAS).order_by(DOUBANMEDIAS.MARK_DATE.desc()).limit(int(rownum)).offset(begin_pos).all()
 
     @DbPersist(_db)
     def update_downloader(self,

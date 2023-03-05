@@ -21,7 +21,7 @@ class ThreadHelper:
         if e is None:
             return
         tb = e.__traceback__
-        log.debug("【Exception】线程执行异常，错误: " + "".join(traceback.format_tb(tb)))
+        log.debug(f"【Exception】线程执行异常，错误: {str(e)}" + "".join(traceback.format_tb(tb)))
 
     def start_thread(self, func, kwargs):
         thread_pool_exc = self.executor.submit(func, *kwargs)

@@ -1294,7 +1294,7 @@ class FileTransfer:
                 # 登记媒体库刷新
                 if refresh_item not in refresh_library_items:
                     refresh_library_items.append(refresh_item)
-        if refresh_library_items and self._refresh_mediaserver:
+        if refresh_library_items:
             # 解发转移完成事件
             self.eventmanager.send_event(EventType.LibraryFileDeleted, {
                 "in_path": path,
@@ -1348,6 +1348,7 @@ class FileTransfer:
         except Exception as e:
             ExceptionUtils.exception_traceback(e)
             return False, f"{file} 删除失败"
+
 
 if __name__ == "__main__":
     """

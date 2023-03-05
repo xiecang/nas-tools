@@ -7,7 +7,7 @@ from app.message import Message
 from app.downloader import Downloader
 from app.media import Media
 from app.helper import ProgressHelper
-from app.utils.types import SearchType
+from app.utils.types import SearchType,EventType
 from app.media.meta import MetaVideo
 
 

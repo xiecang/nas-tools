@@ -48,6 +48,259 @@ from web.backend.web_utils import WebUtils
 class WebAction:
     dbhelper = None
     _actions = {}
+    user_menu = [
+        {
+            "name": "我的媒体库",
+            "level": 1,
+            "page": "index",
+            "icon": '\n                      <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><polyline points="5 12 3 12 12 3 21 12 19 12"></polyline><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7"></path><path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6"></path></svg>\n                    ',
+        }, {
+            "name": "探索",
+            "level": 2,
+            "list": [
+                {
+                    "name": "榜单推荐",
+                    "level": 2,
+                    "page": "ranking",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-align-box-bottom-center" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z"></path>\n                                <path d="M9 15v2"></path>\n                                <path d="M12 11v6"></path>\n                                <path d="M15 13v4"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "豆瓣电影",
+                    "level": 2,
+                    "page": "douban_movie",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-movie" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z"></path>\n                                <path d="M8 4l0 16"></path>\n                                <path d="M16 4l0 16"></path>\n                                <path d="M4 8l4 0"></path>\n                                <path d="M4 16l4 0"></path>\n                                <path d="M4 12l16 0"></path>\n                                <path d="M16 8l4 0"></path>\n                                <path d="M16 16l4 0"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "豆瓣电视剧",
+                    "level": 2,
+                    "page": "douban_tv",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-device-tv" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M3 7m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"></path>\n                                <path d="M16 3l-4 4l-4 -4"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "豆瓣想看",
+                    "level": 2,
+                    "page": "douban_wish",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-douban" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M4 20h16"></path>\n                                <path d="M5 4h14"></path>\n                                <path d="M8 8h8a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2v-2a2 2 0 0 1 2 -2z"></path>\n                                <path d="M16 14l-2 6"></path>\n                                <path d="M8 17l1 3"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "TMDB电影",
+                    "level": 2,
+                    "page": "tmdb_movie",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-movie" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z"></path>\n                                <path d="M8 4l0 16"></path>\n                                <path d="M16 4l0 16"></path>\n                                <path d="M4 8l4 0"></path>\n                                <path d="M4 16l4 0"></path>\n                                <path d="M4 12l16 0"></path>\n                                <path d="M16 8l4 0"></path>\n                                <path d="M16 16l4 0"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "TMDB电视剧",
+                    "level": 2,
+                    "page": "tmdb_tv",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-device-tv" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M3 7m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"></path>\n                                <path d="M16 3l-4 4l-4 -4"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "BANGUMI",
+                    "level": 2,
+                    "page": "bangumi",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-device-tv-old" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                 <path d="M3 7m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"></path>\n                                 <path d="M16 3l-4 4l-4 -4"></path>\n                                 <path d="M15 7v13"></path>\n                                 <path d="M18 15v.01"></path>\n                                 <path d="M18 12v.01"></path>\n                              </svg>\n                            ',
+                },
+            ],
+        }, {
+            "name": "资源搜索",
+            "level": 2,
+            "page": "search",
+            "icon": '\n                      <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><circle cx="10" cy="10" r="7"></circle><line x1="21" y1="21" x2="15" y2="15"></line></svg>\n                    ',
+        }, {
+            "name": "站点管理",
+            "level": 2,
+            "list": [
+                {
+                    "name": "站点维护",
+                    "level": 2,
+                    "page": "site",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-server-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><rect x="3" y="4" width="18" height="8" rx="3"></rect><rect x="3" y="12" width="18" height="8" rx="3"></rect><line x1="7" y1="8" x2="7" y2="8.01"></line><line x1="7" y1="16" x2="7" y2="16.01"></line><path d="M11 8h6"></path><path d="M11 16h6"></path></svg>\n                            ',
+                },
+                {
+                    "name": "数据统计",
+                    "level": 2,
+                    "page": "statistics",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chart-pie" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                 <path d="M10 3.2a9 9 0 1 0 10.8 10.8a1 1 0 0 0 -1 -1h-6.8a2 2 0 0 1 -2 -2v-7a.9 .9 0 0 0 -1 -.8"></path>\n                                 <path d="M15 3.5a9 9 0 0 1 5.5 5.5h-4.5a1 1 0 0 1 -1 -1v-4.5"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "刷流任务",
+                    "level": 2,
+                    "page": "brushtask",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check"list" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M9.615 20h-2.615a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v8"></path>\n                                <path d="M14 19l2 2l4 -4"></path>\n                                <path d="M9 8h4"></path>\n                                <path d="M9 12h2"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "站点资源",
+                    "level": 2,
+                    "page": "sitelist",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cloud-computing" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M6.657 16c-2.572 0 -4.657 -2.007 -4.657 -4.483c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.913 0 3.464 1.56 3.464 3.486c0 1.927 -1.551 3.487 -3.465 3.487h-11.878"></path>\n                                <path d="M12 16v5"></path>\n                                <path d="M16 16v4a1 1 0 0 0 1 1h4"></path>\n                                <path d="M8 16v4a1 1 0 0 1 -1 1h-4"></path>\n                              </svg>\n                            ',
+                },
+            ],
+        }, {
+            "name": "订阅管理",
+            "level": 2,
+            "list": [
+                {
+                    "name": "电影订阅",
+                    "level": 2,
+                    "page": "movie_rss",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-movie" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z"></path>\n                                <path d="M8 4l0 16"></path>\n                                <path d="M16 4l0 16"></path>\n                                <path d="M4 8l4 0"></path>\n                                <path d="M4 16l4 0"></path>\n                                <path d="M4 12l16 0"></path>\n                                <path d="M16 8l4 0"></path>\n                                <path d="M16 16l4 0"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "电视剧订阅",
+                    "level": 2,
+                    "page": "tv_rss",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-device-tv" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M3 7m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"></path>\n                                <path d="M16 3l-4 4l-4 -4"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "自定义订阅",
+                    "level": 2,
+                    "page": "user_rss",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-rss" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>\n                                <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>\n                                <path d="M12 17a3 3 0 0 0 -3 -3"></path>\n                                <path d="M15 17a6 6 0 0 0 -6 -6"></path>\n                                <path d="M9 17h.01"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "订阅日历",
+                    "level": 2,
+                    "page": "rss_calendar",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M4 5m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z"></path>\n                                <path d="M16 3l0 4"></path>\n                                <path d="M8 3l0 4"></path>\n                                <path d="M4 11l16 0"></path>\n                                <path d="M11 15l1 0"></path>\n                                <path d="M12 15l0 3"></path>\n                              </svg>\n                            ',
+                },
+            ],
+        }, {
+            "name": "下载管理",
+            "level": 2,
+            "list": [
+                {
+                    "name": "正在下载",
+                    "level": 2,
+                    "page": "downloading",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-loader" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M12 6l0 -3"></path>\n                                <path d="M16.25 7.75l2.15 -2.15"></path>\n                                <path d="M18 12l3 0"></path>\n                                <path d="M16.25 16.25l2.15 2.15"></path>\n                                <path d="M12 18l0 3"></path>\n                                <path d="M7.75 16.25l-2.15 2.15"></path>\n                                <path d="M6 12l-3 0"></path>\n                                <path d="M7.75 7.75l-2.15 -2.15"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "近期下载",
+                    "level": 2,
+                    "page": "downloaded",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-download" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"></path><polyline points="7 11 12 16 17 11"></polyline><line x1="12" y1="4" x2="12" y2="16"></line></svg>\n                            ',
+                },
+                {
+                    "name": "自动删种",
+                    "level": 2,
+                    "page": "torrent_remove",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-download-off" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 1.83 -1.19"></path>\n                                <path d="M7 11l5 5l2 -2m2 -2l1 -1"></path>\n                                <path d="M12 4v4m0 4v4"></path>\n                                <path d="M3 3l18 18"></path>\n                              </svg>\n                            ',
+                },
+            ],
+        }, {
+            "name": "媒体整理",
+            "level": 1,
+            "list": [
+                {
+                    "name": "文件管理",
+                    "level": 1,
+                    "page": "mediafile",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-pencil" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>\n                                <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>\n                                <path d="M10 18l5 -5a1.414 1.414 0 0 0 -2 -2l-5 5v2h2z"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "手动识别",
+                    "level": 1,
+                    "page": "unidentification",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-accessible" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"></path>\n                                <path d="M10 16.5l2 -3l2 3m-2 -3v-2l3 -1m-6 0l3 1"></path>\n                                <circle cx="12" cy="7.5" r=".5" fill="currentColor"></circle>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "历史记录",
+                    "level": 1,
+                    "page": "history",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-history" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M12 8l0 4l2 2"></path>\n                                <path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "TMDB缓存",
+                    "level": 1,
+                    "page": "tmdbcache",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-headlessui" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M6.744 4.325l7.82 -1.267a4.456 4.456 0 0 1 5.111 3.686l1.267 7.82a4.456 4.456 0 0 1 -3.686 5.111l-7.82 1.267a4.456 4.456 0 0 1 -5.111 -3.686l-1.267 -7.82a4.456 4.456 0 0 1 3.686 -5.111z"></path>\n                                <path d="M7.252 7.704l7.897 -1.28a1 1 0 0 1 1.147 .828l.36 2.223l-9.562 3.51l-.67 -4.134a1 1 0 0 1 .828 -1.147z"></path>\n                              </svg>\n                            ',
+                },
+            ],
+        }, {
+            "name": "服务",
+            "level": 1,
+            "page": "service",
+            "icon": '\n                      <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-layout-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><rect x="4" y="4" width="6" height="5" rx="2"></rect><rect x="4" y="13" width="6" height="7" rx="2"></rect><rect x="14" y="4" width="6" height="7" rx="2"></rect><rect x="14" y="15" width="6" height="5" rx="2"></rect></svg>\n                    ',
+        }, {
+            "name": "系统设置",
+            "also": "设置",
+            "level": 1,
+            "list": [
+                {
+                    "name": "基础设置",
+                    "level": 1,
+                    "page": "basic",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-settings" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"></path><circle cx="12" cy="12" r="3"></circle></svg>\n                            ',
+                },
+                {
+                    "name": "用户管理",
+                    "level": 2,
+                    "page": "users",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-users" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M9 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"></path>\n                                <path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"></path>\n                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>\n                                <path d="M21 21v-2a4 4 0 0 0 -3 -3.85"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "媒体库",
+                    "level": 1,
+                    "page": "library",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-stereo-glasses" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M8 3h-2l-3 9"></path>\n                                <path d="M16 3h2l3 9"></path>\n                                <path d="M3 12v7a1 1 0 0 0 1 1h4.586a1 1 0 0 0 .707 -.293l2 -2a1 1 0 0 1 1.414 0l2 2a1 1 0 0 0 .707 .293h4.586a1 1 0 0 0 1 -1v-7h-18z"></path>\n                                <path d="M7 16h1"></path>\n                                <path d="M16 16h1"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "目录同步",
+                    "level": 1,
+                    "page": "directorysync",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-refresh" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"></path>\n                                <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "消息通知",
+                    "level": 2,
+                    "page": "notification",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-bell" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M10 5a2 2 0 0 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6"></path>\n                                <path d="M9 17v1a3 3 0 0 0 6 0v-1"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "过滤规则",
+                    "level": 2,
+                    "page": "filterrule",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-filter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M5.5 5h13a1 1 0 0 1 .5 1.5l-5 5.5l0 7l-4 -3l0 -4l-5 -5.5a1 1 0 0 1 .5 -1.5"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "自定义识别词",
+                    "level": 1,
+                    "page": "customwords",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-a-b" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M3 16v-5.5a2.5 2.5 0 0 1 5 0v5.5m0 -4h-5"></path>\n                                <path d="M12 6l0 12"></path>\n                                <path d="M16 16v-8h3a2 2 0 0 1 0 4h-3m3 0a2 2 0 0 1 0 4h-3"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "索引器",
+                    "level": 2,
+                    "page": "indexer",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-list-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M15 15m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"></path>\n                                <path d="M18.5 18.5l2.5 2.5"></path>\n                                <path d="M4 6h16"></path>\n                                <path d="M4 12h4"></path>\n                                <path d="M4 18h4"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "下载器",
+                    "level": 2,
+                    "page": "downloader",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-download" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"></path>\n                                <path d="M7 11l5 5l5 -5"></path>\n                                <path d="M12 4l0 12"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "媒体服务器",
+                    "level": 2,
+                    "page": "mediaserver",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-server-cog" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M3 4m0 3a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3z"></path>\n                                <path d="M12 20h-6a3 3 0 0 1 -3 -3v-2a3 3 0 0 1 3 -3h10.5"></path>\n                                <path d="M18 18m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"></path>\n                                <path d="M18 14.5v1.5"></path>\n                                <path d="M18 20v1.5"></path>\n                                <path d="M21.032 16.25l-1.299 .75"></path>\n                                <path d="M16.27 19l-1.3 .75"></path>\n                                <path d="M14.97 16.25l1.3 .75"></path>\n                                <path d="M19.733 19l1.3 .75"></path>\n                                <path d="M7 8v.01"></path>\n                                <path d="M7 16v.01"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "豆瓣",
+                    "level": 2,
+                    "page": "douban",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-douban" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M4 20h16"></path>\n                                <path d="M5 4h14"></path>\n                                <path d="M8 8h8a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2v-2a2 2 0 0 1 2 -2z"></path>\n                                <path d="M16 14l-2 6"></path>\n                                <path d="M8 17l1 3"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "插件",
+                    "level": 1,
+                    "page": "plugin",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-codesandbox" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                 <path d="M20 7.5v9l-4 2.25l-4 2.25l-4 -2.25l-4 -2.25v-9l4 -2.25l4 -2.25l4 2.25z"></path>\n                                 <path d="M12 12l4 -2.25l4 -2.25"></path>\n                                 <path d="M12 12l0 9"></path>\n                                 <path d="M12 12l-4 -2.25l-4 -2.25"></path>\n                                 <path d="M20 12l-4 2v4.75"></path>\n                                 <path d="M4 12l4 2l0 4.75"></path>\n                                 <path d="M8 5.25l4 2.25l4 -2.25"></path>\n                              </svg>\n                            ',
+                },
+            ],
+        },
+    ]
 
     def __init__(self):
         self.dbhelper = DbHelper()
@@ -248,7 +501,7 @@ class WebAction:
             "data": result
         }
 
-    @staticmethod
+    @ staticmethod
     def stop_service():
         """
         关闭服务
@@ -266,7 +519,7 @@ class WebAction:
         # 关闭插件
         PluginManager().stop_service()
 
-    @staticmethod
+    @ staticmethod
     def start_service():
         # 加载索引器配置
         IndexerHelper()
@@ -309,7 +562,7 @@ class WebAction:
         else:
             os.system("pm2 restart NAStool")
 
-    @staticmethod
+    @ staticmethod
     def handle_message_job(msg, in_from=SearchType.OT, user_id=None, user_name=None):
         """
         处理消息事件
@@ -352,7 +605,7 @@ class WebAction:
             ThreadHelper().start_thread(search_media_by_message,
                                         (msg, in_from, user_id, user_name))
 
-    @staticmethod
+    @ staticmethod
     def set_config_value(cfg, cfg_key, cfg_value):
         """
         根据Key设置配置值
@@ -408,7 +661,7 @@ class WebAction:
 
         return cfg
 
-    @staticmethod
+    @ staticmethod
     def set_config_directory(cfg, oper, cfg_key, cfg_value, update_value=None):
         """
         更新目录数据
@@ -467,7 +720,7 @@ class WebAction:
                     cfg[keys[0]][keys[1]] = cfg_value.replace("\\", "/")
         return cfg
 
-    @staticmethod
+    @ staticmethod
     def __sch(data):
         """
         启动定时服务
@@ -486,7 +739,7 @@ class WebAction:
             ThreadHelper().start_thread(commands.get(sch_item), ())
         return {"retmsg": "服务已启动", "item": sch_item}
 
-    @staticmethod
+    @ staticmethod
     def __search(data):
         """
         WEB检索资源
@@ -540,7 +793,7 @@ class WebAction:
                 return {"retcode": -1, "retmsg": ret_msg}
         return {"retcode": 0, "retmsg": ""}
 
-    @staticmethod
+    @ staticmethod
     def __download_link(data):
         """
         从WEB添加下载链接
@@ -576,7 +829,7 @@ class WebAction:
             return {"code": 1, "msg": ret_msg or "如连接正常，请检查下载任务是否存在"}
         return {"code": 0, "msg": "下载成功"}
 
-    @staticmethod
+    @ staticmethod
     def __download_torrent(data):
         """
         从种子文件添加下载
@@ -603,7 +856,7 @@ class WebAction:
 
         return {"code": 0, "msg": "添加下载完成！"}
 
-    @staticmethod
+    @ staticmethod
     def __pt_start(data):
         """
         开始下载
@@ -613,7 +866,7 @@ class WebAction:
             Downloader().start_torrents(ids=tid)
         return {"retcode": 0, "id": tid}
 
-    @staticmethod
+    @ staticmethod
     def __pt_stop(data):
         """
         停止下载
@@ -623,7 +876,7 @@ class WebAction:
             Downloader().stop_torrents(ids=tid)
         return {"retcode": 0, "id": tid}
 
-    @staticmethod
+    @ staticmethod
     def __pt_remove(data):
         """
         删除下载
@@ -633,7 +886,7 @@ class WebAction:
             Downloader().delete_torrents(ids=tid, delete_file=True)
         return {"retcode": 0, "id": tid}
 
-    @staticmethod
+    @ staticmethod
     def __pt_info(data):
         """
         查询具体种子的信息
@@ -761,7 +1014,7 @@ class WebAction:
         else:
             return {"retcode": 2, "retmsg": ret_msg}
 
-    @staticmethod
+    @ staticmethod
     def __manual_transfer(inpath,
                           syncmod,
                           outpath=None,
@@ -941,14 +1194,14 @@ class WebAction:
                                     ExceptionUtils.exception_traceback(e)
         return {"retcode": 0}
 
-    @staticmethod
+    @ staticmethod
     def delete_media_file(filedir, filename):
         """
         删除媒体文件，空目录也会被删除
         """
         return FileTransfer().delete_file_path(filedir, filename)
 
-    @staticmethod
+    @ staticmethod
     def __logging(data):
         """
         查询实时日志
@@ -981,7 +1234,7 @@ class WebAction:
                     log_list = []
         return {"loglist": log_list}
 
-    @staticmethod
+    @ staticmethod
     def __version(data):
         """
         检查新版本
@@ -1056,7 +1309,7 @@ class WebAction:
         BrushTask().init_config()
         return {"code": ret}
 
-    @staticmethod
+    @ staticmethod
     def __get_site(data):
         """
         查询单个站点信息
@@ -1079,7 +1332,7 @@ class WebAction:
             ret = []
         return {"code": 0, "site": ret, "site_free": site_free, "site_2xfree": site_2xfree, "site_hr": site_hr}
 
-    @staticmethod
+    @ staticmethod
     def __get_sites(data):
         """
         查询多个站点信息
@@ -1171,7 +1424,7 @@ class WebAction:
             ExceptionUtils.exception_traceback(e)
             return {"code": 1, "msg": str(e)}
 
-    @staticmethod
+    @ staticmethod
     def __logout(data):
         """
         注销
@@ -1572,7 +1825,7 @@ class WebAction:
             "seasons": seasons
         }
 
-    @staticmethod
+    @ staticmethod
     def __test_connection(data):
         """
         测试连通性
@@ -1629,7 +1882,7 @@ class WebAction:
             return {"code": 0, "success": False}
         return {"code": -1, "success": False, 'message': '操作失败'}
 
-    @staticmethod
+    @ staticmethod
     def __refresh_rss(data):
         """
         重新搜索RSS
@@ -1643,7 +1896,7 @@ class WebAction:
             ThreadHelper().start_thread(Subscribe().subscribe_search_tv, (rssid,))
         return {"code": 0, "page": page}
 
-    @staticmethod
+    @ staticmethod
     def get_system_message(lst_time):
         messages = MessageCenter().get_system_messages(lst_time=lst_time)
         if messages:
@@ -1684,7 +1937,7 @@ class WebAction:
             """)
         return {"code": 0, "message": message_html, "lst_time": lst_time}
 
-    @staticmethod
+    @ staticmethod
     def __delete_tmdb_cache(data):
         """
         删除tmdb缓存
@@ -1693,7 +1946,7 @@ class WebAction:
             MetaHelper().save_meta_data()
         return {"code": 0}
 
-    @staticmethod
+    @ staticmethod
     def __movie_calendar_data(data):
         """
         查询电影上映日期
@@ -1753,7 +2006,7 @@ class WebAction:
                         "rssid": rssid
                         }
 
-    @staticmethod
+    @ staticmethod
     def __tv_calendar_data(data):
         """
         查询电视剧上映日期
@@ -1825,7 +2078,7 @@ class WebAction:
                 })
             return {"code": 0, "events": episode_events}
 
-    @staticmethod
+    @ staticmethod
     def __rss_detail(data):
         rid = data.get("rssid")
         mtype = data.get("rsstype")
@@ -1843,7 +2096,7 @@ class WebAction:
             rssdetail["type"] = "TV"
         return {"code": 0, "detail": rssdetail}
 
-    @staticmethod
+    @ staticmethod
     def __modify_tmdb_cache(data):
         """
         修改TMDB缓存的标题
@@ -1954,7 +2207,7 @@ class WebAction:
             return {"code": 0}
         return {"code": 1}
 
-    @staticmethod
+    @ staticmethod
     def __brushtask_detail(data):
         """
         查询刷流任务详情
@@ -1978,7 +2231,7 @@ class WebAction:
             return {"code": 0, "data": {"name": "无法识别"}}
         return {"code": 0, "data": self.mediainfo_dict(media_info)}
 
-    @staticmethod
+    @ staticmethod
     def mediainfo_dict(media_info):
         if not media_info:
             return {}
@@ -2015,7 +2268,7 @@ class WebAction:
             "offset_words": media_info.offset_words
         }
 
-    @staticmethod
+    @ staticmethod
     def __rule_test(data):
         title = data.get("title")
         subtitle = data.get("subtitle")
@@ -2035,7 +2288,7 @@ class WebAction:
             "order": 100 - res_order if res_order else 0
         }
 
-    @staticmethod
+    @ staticmethod
     def __net_test(data):
         target = data
         if target == "image.tmdb.org":
@@ -2061,7 +2314,7 @@ class WebAction:
         else:
             return {"res": False, "time": "%s 毫秒" % seconds}
 
-    @staticmethod
+    @ staticmethod
     def __get_site_activity(data):
         """
         查询site活动[上传，下载，魔力值]
@@ -2077,7 +2330,7 @@ class WebAction:
             {"dataset": SiteUserInfo().get_pt_site_activity_history(data["name"])})
         return resp
 
-    @staticmethod
+    @ staticmethod
     def __get_site_history(data):
         """
         查询site 历史[上传，下载]
@@ -2097,7 +2350,7 @@ class WebAction:
         resp.update({"dataset": dataset})
         return resp
 
-    @staticmethod
+    @ staticmethod
     def __get_site_seeding_info(data):
         """
         查询site 做种分布信息 大小，做种数
@@ -2183,7 +2436,7 @@ class WebAction:
         Filter().init_config()
         return {"code": 0}
 
-    @staticmethod
+    @ staticmethod
     def __filterrule_detail(data):
         rid = data.get("ruleid")
         groupid = data.get("groupid")
@@ -2337,7 +2590,7 @@ class WebAction:
         else:
             return {"code": 0, "Items": []}
 
-    @staticmethod
+    @ staticmethod
     def parse_brush_rule_string(rules: dict):
         if not rules:
             return ""
@@ -2437,7 +2690,7 @@ class WebAction:
 
         return "<br>".join(rule_htmls)
 
-    @staticmethod
+    @ staticmethod
     def __clear_tmdb_cache(data):
         """
         清空TMDB缓存
@@ -2450,7 +2703,7 @@ class WebAction:
             return {"code": 0, "msg": str(e)}
         return {"code": 0}
 
-    @staticmethod
+    @ staticmethod
     def __check_site_attr(data):
         """
         检查站点标识
@@ -2465,7 +2718,7 @@ class WebAction:
             site_hr = True
         return {"code": 0, "site_free": site_free, "site_2xfree": site_2xfree, "site_hr": site_hr}
 
-    @staticmethod
+    @ staticmethod
     def __refresh_process(data):
         """
         刷新进度条
@@ -2476,7 +2729,7 @@ class WebAction:
         else:
             return {"code": 1, "value": 0, "text": "正在处理..."}
 
-    @staticmethod
+    @ staticmethod
     def __restory_backup(data):
         """
         解压恢复备份文件
@@ -2498,7 +2751,7 @@ class WebAction:
 
         return {"code": 1, "msg": "文件不存在"}
 
-    @staticmethod
+    @ staticmethod
     def __start_mediasync(data):
         """
         开始媒体库同步
@@ -2508,7 +2761,7 @@ class WebAction:
         ThreadHelper().start_thread(MediaServer().sync_mediaserver, ())
         return {"code": 0}
 
-    @staticmethod
+    @ staticmethod
     def __mediasync_state(data):
         """
         获取媒体库同步数据情况
@@ -2522,7 +2775,7 @@ class WebAction:
                                         status.get("tv_count"),
                                         status.get("time"))}
 
-    @staticmethod
+    @ staticmethod
     def __get_tvseason_list(data):
         """
         获取剧集季列表
@@ -2556,7 +2809,7 @@ class WebAction:
             ]
         return {"code": 0, "seasons": seasons}
 
-    @staticmethod
+    @ staticmethod
     def __get_userrss_task(data):
         """
         获取自定义订阅详情
@@ -2615,7 +2868,7 @@ class WebAction:
         else:
             return {"code": 1}
 
-    @staticmethod
+    @ staticmethod
     def __get_rssparser(data):
         """
         获取订阅解析器详情
@@ -2650,17 +2903,17 @@ class WebAction:
         else:
             return {"code": 1}
 
-    @staticmethod
+    @ staticmethod
     def __run_userrss(data):
         RssChecker().check_task_rss(data.get("id"))
         return {"code": 0}
 
-    @staticmethod
+    @ staticmethod
     def __run_brushtask(data):
         BrushTask().check_task_rss(data.get("id"))
         return {"code": 0}
 
-    @staticmethod
+    @ staticmethod
     def __list_site_resources(data):
         resources = Indexer().list_builtin_resources(index_id=data.get("id"),
                                                      page=data.get("page"),
@@ -2670,7 +2923,7 @@ class WebAction:
         else:
             return {"code": 0, "data": resources}
 
-    @staticmethod
+    @ staticmethod
     def __list_rss_articles(data):
         uses = RssChecker().get_rsstask_info(taskid=data.get("id")).get("uses")
         articles = RssChecker().get_rss_articles(data.get("id"))
@@ -2711,7 +2964,7 @@ class WebAction:
         else:
             return {"code": 1, "msg": "无下载记录"}
 
-    @staticmethod
+    @ staticmethod
     def __rss_articles_check(data):
         if not data.get("articles"):
             return {"code": 2}
@@ -2722,7 +2975,7 @@ class WebAction:
         else:
             return {"code": 1}
 
-    @staticmethod
+    @ staticmethod
     def __rss_articles_download(data):
         if not data.get("articles"):
             return {"code": 2}
@@ -2985,7 +3238,7 @@ class WebAction:
             ExceptionUtils.exception_traceback(e)
             return {"code": 1, "msg": str(e)}
 
-    @staticmethod
+    @ staticmethod
     def __analyse_import_custom_words_code(data):
         try:
             import_code = data.get('import_code')
@@ -3088,7 +3341,7 @@ class WebAction:
             ExceptionUtils.exception_traceback(e)
             return {"code": 1, "msg": str(e)}
 
-    @staticmethod
+    @ staticmethod
     def get_categories(data):
         if data.get("type") == "电影":
             categories = Category().get_movie_categorys()
@@ -3184,7 +3437,7 @@ class WebAction:
             ExceptionUtils.exception_traceback(err)
             return {"code": 1, "msg": "数据格式不正确，%s" % str(err)}
 
-    @staticmethod
+    @ staticmethod
     def get_library_spacesize(data=None):
         """
         查询媒体库存储空间
@@ -3304,7 +3557,7 @@ class WebAction:
             "AnimeNums": AnimeNums
         }
 
-    @staticmethod
+    @ staticmethod
     def get_library_mediacount(data=None):
         """
         查询媒体库统计数据
@@ -3325,7 +3578,7 @@ class WebAction:
         else:
             return {"code": -1, "msg": "媒体库服务器连接失败"}
 
-    @staticmethod
+    @ staticmethod
     def get_library_playhistory(data=None):
         """
         查询媒体库播放记录
@@ -3529,7 +3782,7 @@ class WebAction:
                                           reverse=True)
         return {"code": 0, "total": total, "result": SearchResults}
 
-    @staticmethod
+    @ staticmethod
     def search_media_infos(data):
         """
         根据关键字搜索相似词条
@@ -3543,14 +3796,14 @@ class WebAction:
 
         return {"code": 0, "result": [media.to_dict() for media in medias]}
 
-    @staticmethod
+    @ staticmethod
     def get_movie_rss_list(data=None):
         """
         查询所有电影订阅
         """
         return {"code": 0, "result": Subscribe().get_subscribe_movies()}
 
-    @staticmethod
+    @ staticmethod
     def get_tv_rss_list(data=None):
         """
         查询所有电视剧订阅
@@ -3576,7 +3829,7 @@ class WebAction:
         MediaHander = Media()
         group = {}
         history = self.dbhelper.get_download_history(hash=list(map(lambda x: x.get("id"), torrents)))
-        history = {x.TORRENT_HASH: x for x in history}
+        history = {x.DOWNLOAD_ID: x for x in history}
         for torrent in torrents:
             poster_path = ''
             name = torrent.get("name")
@@ -3591,7 +3844,6 @@ class WebAction:
                 media_info = MediaHander.get_media_info(title=name)
                 if not media_info:
                     continue
-                self.dbhelper.insert_download_history(media_info, torrent.get("id"))
                 if not media_info.tmdb_info:
                     year = media_info.year
                     if year:
@@ -3749,7 +4001,7 @@ class WebAction:
                           "help": word_info.HELP, })
         groups = [{"id": "-1",
                    "name": "通用",
-                   "link": "",
+                  "link": "",
                    "type": "1",
                    "seasons": "0",
                    "words": words}]
@@ -3819,7 +4071,7 @@ class WebAction:
             Users.append({"id": user.ID, "name": user.NAME, "pris": pris})
         return {"code": 0, "result": Users}
 
-    @staticmethod
+    @ staticmethod
     def get_filterrules(data=None):
         """
         查询所有过滤规则
@@ -3870,7 +4122,7 @@ class WebAction:
         Config().save_config(cfg)
         return {"code": 0}
 
-    @staticmethod
+    @ staticmethod
     def __test_site(data):
         """
         测试站点连通性
@@ -3879,7 +4131,7 @@ class WebAction:
         code = 0 if flag else -1
         return {"code": code, "msg": msg, "time": times}
 
-    @staticmethod
+    @ staticmethod
     def __get_sub_path(data):
         """
         查询下级子目录
@@ -3945,7 +4197,7 @@ class WebAction:
             "data": r
         }
 
-    @staticmethod
+    @ staticmethod
     def __rename_file(data):
         """
         文件重命名
@@ -3976,7 +4228,7 @@ class WebAction:
                     log.info(f"【Web】{del_msg}")
         return {"code": 0}
 
-    @staticmethod
+    @ staticmethod
     def __download_subtitle(data):
         """
         从配置的字幕服务下载单个文件的字幕
@@ -3998,7 +4250,7 @@ class WebAction:
         })
         return {"code": 0, "msg": "字幕下载任务已提交，正在后台运行。"}
 
-    @staticmethod
+    @ staticmethod
     def __get_download_setting(data):
         sid = data.get("sid")
         if sid:
@@ -4096,7 +4348,7 @@ class WebAction:
         else:
             return {"code": 1}
 
-    @staticmethod
+    @ staticmethod
     def __get_message_client(data):
         """
         获取消息设置
@@ -4104,7 +4356,7 @@ class WebAction:
         cid = data.get("cid")
         return {"code": 0, "detail": Message().get_message_client_info(cid=cid)}
 
-    @staticmethod
+    @ staticmethod
     def __test_message_client(data):
         """
         测试消息设置
@@ -4117,14 +4369,14 @@ class WebAction:
         else:
             return {"code": 1}
 
-    @staticmethod
+    @ staticmethod
     def __get_indexers(data=None):
         """
         获取索引器
         """
         return {"code": 0, "indexers": Indexer().get_indexer_dict()}
 
-    @staticmethod
+    @ staticmethod
     def __get_download_dirs(data):
         """
         获取下载目录
@@ -4136,7 +4388,7 @@ class WebAction:
         dirs = Downloader().get_download_dirs(setting=sid)
         return {"code": 0, "paths": dirs}
 
-    @staticmethod
+    @ staticmethod
     def __find_hardlinks(data):
         files = data.get("files")
         file_dir = data.get("dir")
@@ -4160,7 +4412,7 @@ class WebAction:
                 return {"code": 1}
         return {"code": 0, "data": hardlinks}
 
-    @staticmethod
+    @ staticmethod
     def __update_sites_cookie_ua(data):
         """
         更新所有站点的Cookie和UA
@@ -4197,7 +4449,7 @@ class WebAction:
         Sites().init_config()
         return {"code": 0, "messages": "请求发送成功"}
 
-    @staticmethod
+    @ staticmethod
     def __set_site_captcha_code(data):
         """
         设置站点验证码
@@ -4207,7 +4459,7 @@ class WebAction:
         SiteCookie().set_code(code=code, value=value)
         return {"code": 0}
 
-    @staticmethod
+    @ staticmethod
     def __update_torrent_remove_task(data):
         """
         更新自动删种任务
@@ -4219,7 +4471,7 @@ class WebAction:
             TorrentRemover().init_config()
             return {"code": 0}
 
-    @staticmethod
+    @ staticmethod
     def __get_torrent_remove_task(data=None):
         """
         获取自动删种任务
@@ -4230,7 +4482,7 @@ class WebAction:
             tid = None
         return {"code": 0, "detail": TorrentRemover().get_torrent_remove_tasks(taskid=tid)}
 
-    @staticmethod
+    @ staticmethod
     def __delete_torrent_remove_task(data):
         """
         删除自动删种任务
@@ -4243,7 +4495,7 @@ class WebAction:
         else:
             return {"code": 1}
 
-    @staticmethod
+    @ staticmethod
     def __get_remove_torrents(data):
         """
         获取满足自动删种任务的种子
@@ -4254,7 +4506,7 @@ class WebAction:
             return {"code": 1, "msg": "未获取到符合处理条件种子"}
         return {"code": 0, "data": torrents}
 
-    @staticmethod
+    @ staticmethod
     def __auto_remove_torrents(data):
         """
         执行自动删种任务
@@ -4263,7 +4515,7 @@ class WebAction:
         TorrentRemover().auto_remove_torrents(taskids=tid)
         return {"code": 0}
 
-    @staticmethod
+    @ staticmethod
     def __get_site_favicon(data):
         """
         获取站点图标
@@ -4314,7 +4566,7 @@ class WebAction:
             return {"code": 1, "msg": "未下载种子或未获取到种子明细"}
         return {"code": 0, "data": [item.as_dict() for item in results]}
 
-    @staticmethod
+    @ staticmethod
     def __set_system_config(data):
         """
         设置系统设置（数据库）
@@ -4330,7 +4582,7 @@ class WebAction:
             ExceptionUtils.exception_traceback(e)
             return {"code": 1}
 
-    @staticmethod
+    @ staticmethod
     def get_site_user_statistics(data):
         """
         获取站点用户统计信息
@@ -4351,7 +4603,7 @@ class WebAction:
                 item["site_hash"] = StringUtils.md5_hash(item.get("site"))
         return {"code": 0, "data": statistics}
 
-    @staticmethod
+    @ staticmethod
     def send_custom_message(data):
         """
         发送自定义消息
@@ -4362,7 +4614,7 @@ class WebAction:
         Message().send_custom_message(title=title, text=text, image=image)
         return {"code": 0}
 
-    @staticmethod
+    @ staticmethod
     def get_rmt_modes():
         RmtModes = ModuleConf.RMT_MODES_LITE if SystemUtils.is_lite_version(
         ) else ModuleConf.RMT_MODES
@@ -4475,7 +4727,7 @@ class WebAction:
             }
         }
 
-    @staticmethod
+    @ staticmethod
     def __media_similar(data):
         """
         查询TMDB相似媒体
@@ -4492,7 +4744,7 @@ class WebAction:
             result = Media().get_tv_similar(tmdbid=tmdbid, page=page)
         return {"code": 0, "data": result}
 
-    @staticmethod
+    @ staticmethod
     def __media_recommendations(data):
         """
         查询TMDB同类推荐媒体
@@ -4509,7 +4761,7 @@ class WebAction:
             result = Media().get_tv_recommendations(tmdbid=tmdbid, page=page)
         return {"code": 0, "data": result}
 
-    @staticmethod
+    @ staticmethod
     def __media_person(data):
         """
         根据TMDBID或关键字查询TMDB演员
@@ -4525,7 +4777,7 @@ class WebAction:
             result = Media().search_tmdb_person(name=keyword)
         return {"code": 0, "data": result}
 
-    @staticmethod
+    @ staticmethod
     def __person_medias(data):
         """
         查询演员参演作品
@@ -4542,7 +4794,7 @@ class WebAction:
                                                              mtype=mtype,
                                                              page=page)}
 
-    @staticmethod
+    @ staticmethod
     def __save_user_script(data):
         """
         保存用户自定义脚本
@@ -4556,7 +4808,7 @@ class WebAction:
                                          })
         return {"code": 0, "msg": "保存成功"}
 
-    @staticmethod
+    @ staticmethod
     def __run_directory_sync(data):
         """
         执行单个目录的目录同步
@@ -4564,7 +4816,7 @@ class WebAction:
         Sync().transfer_all_sync(sid=data.get("sid"))
         return {"code": 0, "msg": "执行成功"}
 
-    @staticmethod
+    @ staticmethod
     def __update_plugin_config(data):
         """
         保存插件配置
@@ -4613,7 +4865,7 @@ class WebAction:
             fav = "0"
         return fav, rssid
 
-    @staticmethod
+    @ staticmethod
     def __get_season_episodes(data=None):
         """
         查询TMDB剧集情况
@@ -4642,18 +4894,18 @@ class WebAction:
             "episodes": episodes
         }
 
-    @staticmethod
+    @ staticmethod
     def get_user_menus(data=None):
         """
         查询用户菜单
         """
         return {
             "code": 0,
-            "menus": current_user.get_usermenus(),
-            "level": current_user.level
+            "menus": WebAction.user_menu,
+            "level": 100,
         }
 
-    @staticmethod
+    @ staticmethod
     def get_top_menus(data=None):
         """
         查询顶底菜单列表
@@ -4663,7 +4915,7 @@ class WebAction:
             "menus": current_user.get_topmenus()
         }
 
-    @staticmethod
+    @ staticmethod
     def auth_user_level(data=None):
         """
         用户认证
@@ -4750,7 +5002,7 @@ class WebAction:
         Downloader().init_config()
         return {"code": 0}
 
-    @staticmethod
+    @ staticmethod
     def __get_downloaders(data):
         """
         获取下载器
@@ -4758,7 +5010,7 @@ class WebAction:
         did = data.get("did")
         return {"code": 0, "detail": Downloader().get_downloader_conf(did=did)}
 
-    @staticmethod
+    @ staticmethod
     def __test_downloader(data):
         """
         测试下载器
