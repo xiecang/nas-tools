@@ -113,6 +113,31 @@
     });
   }
 
+  function remove_pt_download(id) {
+    ajax_post("pt_remove", {"id": id}, function (ret) {
+      window_history_refresh();
+    });
+  }
+
+  //更新所有种子页面信息
+  function get_all_torrents_info() {
+    let ids = [];
+    $(".download_ids").each(function () {
+      ids.push($(this).val());
+    });
+    if (ids.length == 0) {
+      return;
+    }
+    ajax_post("pt_info", {"ids": ids}, function (ret) {
+      if (ret.retcode == "0") {
+        for (let torrent of ret.torrents) {
+          update_torrent_ui(torrent);
+        }
+        setTimeout("get_all_torrents_info()", 2000);
+      }
+    }, true, false);
+  }
+
   //显示新增下载界面
   function show_torrent_download_modal() {
     show_download_modal(
