@@ -1,6 +1,6 @@
 html {
     --safe-area-inset-top: 0px;
-    min-height: calc(100% + env(safe-area-inset-top)  + var(--safe-area-inset-top));
+    min-height: calc(100% + env(safe-area-inset-top)  + var(--safe-area-inset-top))
 }
 
 body, .page {
@@ -157,4 +157,14 @@ body, .page {
 
 .select_logger h5{
     padding-right:5px
+}
+
+.table-modal-body {
+    max-height: 40rem;
+    min-height: 300px;
+    overflow-y: auto;
+}
+
+.table-page-body {
+    min-height: 300px;
 }

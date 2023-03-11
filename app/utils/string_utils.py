@@ -177,8 +177,8 @@ class StringUtils:
         """
         将字节计算为文件大小描述（带单位的格式化后返回）
         """
-        if not size:
-            return size
+        if size is None:
+            return ""
         size = re.sub(r"\s|B|iB", "", str(size), re.I)
         if size.replace(".", "").isdigit():
             try:
@@ -249,10 +249,13 @@ class StringUtils:
         return f"{scheme}://{netloc}"
 
     @staticmethod
-    def clear_file_name(name):
+    def clear_file_name(name, is_en=False):
         if not name:
             return None
-        return re.sub(r"[*?\\/\"<>~]", "", name, flags=re.IGNORECASE).replace(":", "：")
+        if not is_en:
+            return re.sub(r"[*?\\/\"<>~]", "", name, flags=re.IGNORECASE).replace(":", "：")
+        else:
+            return re.sub(r"[*?\\/\"<>~]", "", name, flags=re.IGNORECASE)
 
     @staticmethod
     def get_keyword_from_string(content):

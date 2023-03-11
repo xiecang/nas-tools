@@ -9,7 +9,7 @@ from pyquery import PyQuery
 import feapder
 import log
 from app.helper import RedisHelper
-from app.utils import StringUtils, SystemUtils
+from app.utils import StringUtils, SystemUtils, RequestUtils
 from app.utils.exception_utils import ExceptionUtils
 from app.utils.types import MediaType
 from config import Config
@@ -20,7 +20,6 @@ class TorrentSpider(feapder.AirSpider):
     _webdriver_path = SystemUtils.get_webdriver_path()
     _redis_valid = RedisHelper.is_valid()
     __custom_setting__ = dict(
-        USE_SESSION=True,
         SPIDER_THREAD_COUNT=1,
         SPIDER_MAX_RETRY_TIMES=0,
         REQUEST_LOST_TIMEOUT=10,
@@ -191,7 +190,8 @@ class TorrentSpider(feapder.AirSpider):
                 # 查询参数
                 params = {
                     "search_mode": search_mode,
-                    "page": self.page or 0
+                    "page": self.page or 0,
+                    "notnewword": 1
                 }
                 # 额外参数
                 for key, value in self.search.get("params").items():
@@ -253,9 +253,9 @@ class TorrentSpider(feapder.AirSpider):
 
     def download_midware(self, request):
         request.headers = {
-            "User-Agent": self.ua,
-            "Cookie": self.cookie
+            "User-Agent": self.ua
         }
+        request.cookies = RequestUtils.cookie_parse(self.cookie)
         if self.proxies:
             request.proxies = self.proxies
         return request
@@ -567,6 +567,21 @@ class TorrentSpider(feapder.AirSpider):
                     if uploadvolumefactor:
                         self.torrents_info['uploadvolumefactor'] = int(uploadvolumefactor.group(1))
 
+    def Getlabels(self, torrent):
+        # labels
+        if 'labels' not in self.fields:
+            return
+        selector = self.fields.get('labels', {})
+        if not selector:
+            return
+        labels = torrent(selector.get("selector", ""))
+        if 'attribute' in selector:
+            items = [item.attr(selector.get('attribute')) for item in labels.items() if item]
+        else:
+            items = [item.text() for item in labels.items() if item and item.text()]
+        if items:
+            self.torrents_info['labels'] = "|".join(items)
+
     def Getinfo(self, torrent):
         """
         解析单条种子数据
@@ -586,6 +601,7 @@ class TorrentSpider(feapder.AirSpider):
             self.Getuploadvolumefactor(torrent)
             self.Getpubdate(torrent)
             self.Getelapsed_date(torrent)
+            self.Getlabels(torrent)
         except Exception as err:
             ExceptionUtils.exception_traceback(err)
             log.error("【Spider】%s 检索出现错误：%s" % (self.indexername, str(err)))

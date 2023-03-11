@@ -128,7 +128,7 @@
               <div class="col-lg">
                 <div class="mb-3">
                   <label class="form-label">代理服务器 <span class="form-help"
-                                                             title="将使用代理访服务器访问themoviedb、telegram、公开bt站等境外网站及程序更新(git)，站点默认不使用代理，如需使用需在站点维护中开启；配置格式示例：127.0.0.1:7890（Http协议）、socks5://127.0.0.1:8018、socks5h://127.0.0.1:8018(remote DNS)"
+                                                             title="将使用代理访服务器访问themoviedb、telegram等境外网站及程序更新(git)，站点默认不使用代理，如需使用需在站点维护中开启；配置格式示例：127.0.0.1:7890（Http协议）、socks5://127.0.0.1:8018、socks5h://127.0.0.1:8018(remote DNS)"
                                                              data-bs-toggle="tooltip">?</span></label>
                   <input type="text" value="{{ Proxy or '' }}" class="form-control" id="app.proxies"
                          placeholder="127.0.0.1:7890" autocomplete="off">
@@ -254,6 +254,15 @@
                     <option value="seeder" {% if Config.pt.download_order=='seeder' %}selected{% endif %}>做种数优先
                     </option>
                   </select>
+                </div>
+              </div>
+              <div class="col-lg-4">
+                <div class="mb-3">
+                  <label class="form-label">文件管理默认路径 <span class="form-help"
+                                                               title="文件管理、自定义识别等默认路径"
+                                                               data-bs-toggle="tooltip">?</span></label>
+                  <input type="text" value="{{ Config.media.media_default_path or '' }}" class="form-control" id="media.media_default_path"
+                         placeholder="/" autocomplete="off">
                 </div>
               </div>
             </div>
@@ -394,6 +403,8 @@
                          id="pt.search_rss_interval" placeholder="留空关闭订阅定时搜索" autocomplete="off">
                 </div>
               </div>
+            </div>
+            <div class="row">
               <div class="col-xl">
                 <div class="mb-3">
                   <label class="form-label">媒体库同步周期(小时) <span class="form-help"
@@ -403,6 +414,16 @@
                          id="media.mediasync_interval" placeholder="留空关闭媒体库同步" autocomplete="off">
                 </div>
               </div>
+              <div class="col-xl">
+                <div class="mb-3">
+                  <label class="form-label">站点数据刷新时间 <span class="form-help"
+                                                               title="站点数据刷新时间，三种配置方法：1、配置间隔，单位小时，比如23.5；2、配置固定时间，如08:00；3、配置时间范围，如08:00-09:00，表示在该时间范围内随机执行一次；配置为空则不启用自动站点数据刷新功能。"
+                                                               data-bs-toggle="tooltip">?</span></label>
+                  <input type="text" value="{{ Config.pt.ptrefresh_date_cron or '' }}" class="form-control"
+                         id="pt.ptrefresh_date_cron" placeholder="留空关闭自动刷新" autocomplete="off">
+                </div>
+              </div>
+              <div class="col-xl"></div>
             </div>
             <div class="row">
               <div class="col-xl">
@@ -859,7 +880,7 @@
                     <label class="form-check">
                       <input class="form-check-input" type="checkbox" id="scraper_pic.tv.background" {% if
                         Config.scraper_pic and Config.scraper_pic.tv.background %}checked{% endif %}>
-                      <span class="form-check-label">show </span>
+                      <span class="form-check-label">background </span>
                     </label>
                   </div>
                 </div>

@@ -60,7 +60,8 @@ class DbHelper:
                     PAGEURL=media_item.page_url,
                     OTHERINFO=media_item.resource_team,
                     UPLOAD_VOLUME_FACTOR=media_item.upload_volume_factor,
-                    DOWNLOAD_VOLUME_FACTOR=media_item.download_volume_factor
+                    DOWNLOAD_VOLUME_FACTOR=media_item.download_volume_factor,
+                    NOTE=media_item.labels
                 ))
         self._db.insert(data_list)
 
@@ -1226,7 +1227,7 @@ class DbHelper:
                               func.substr(TRANSFERHISTORY.DATE, 1, 10),
                               func.count('*')
                               ).filter(TRANSFERHISTORY.DATE > begin_date).group_by(
-            func.substr(TRANSFERHISTORY.DATE, 1, 10)
+            TRANSFERHISTORY.TYPE, func.substr(TRANSFERHISTORY.DATE, 1, 10)
         ).order_by(TRANSFERHISTORY.DATE).all()
 
     @DbPersist(_db)
@@ -2134,17 +2135,16 @@ class DbHelper:
         else:
             return False
 
-    def check_rss_history(self, media_info):
+    def check_rss_history(self, type_str, name, year, season):
         """
         检查RSS历史是否存在
         """
-        if not media_info:
-            return False
         count = self._db.query(RSSHISTORY).filter(
-            TYPE="MOV" if media_info.type == MediaType.MOVIE else "TV",
-            NAME=media_info.title,
-            YEAR=media_info.year,
-            SEASON=media_info.get_season_string()).count()
+            RSSHISTORY.TYPE == type_str,
+            RSSHISTORY.NAME == name,
+            RSSHISTORY.YEAR == year,
+            RSSHISTORY.SEASON == season
+        ).count()
         if count > 0:
             return True
         else:

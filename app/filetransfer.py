@@ -17,7 +17,7 @@ from app.media.meta import MetaInfo
 from app.message import Message
 from app.plugins import EventManager
 from app.utils import EpisodeFormat, PathUtils, StringUtils, SystemUtils, ExceptionUtils
-from app.utils.types import MediaType, SyncType, RmtMode, EventType
+from app.utils.types import MediaType, SyncType, RmtMode, EventType, ProgressKey
 from config import RMT_SUBEXT, RMT_MEDIAEXT, RMT_FAVTYPE, RMT_MIN_FILESIZE, DEFAULT_MOVIE_FORMAT, \
     DEFAULT_TV_FORMAT, Config
 
@@ -466,18 +466,18 @@ class FileTransfer:
 
         def __finish_transfer(status, message):
             if status:
-                self.progress.update(ptype="filetransfer",
+                self.progress.update(ptype=ProgressKey.FileTransfer,
                                      value=100,
                                      text=f"{in_path} 转移成功！")
             else:
-                self.progress.update(ptype="filetransfer",
+                self.progress.update(ptype=ProgressKey.FileTransfer,
                                      value=100,
                                      text=f"{in_path} 转移失败：{message}！")
-            self.progress.end('filetransfer')
+            self.progress.end(ProgressKey.FileTransfer)
             return status, message
 
         # 开始进度
-        self.progress.start('filetransfer')
+        self.progress.start(ProgressKey.FileTransfer)
 
         episode = (None, False) if not episode else episode
         if not in_path:
@@ -565,8 +565,7 @@ class FileTransfer:
             return __finish_transfer(False, "检索媒体信息出错")
 
         # 更新进度
-        self.progress.update(ptype="filetransfer",
-                             text=f"共 {len(Medias)} 个文件需要处理...")
+        self.progress.update(ptype=ProgressKey.FileTransfer, text=f"共 {len(Medias)} 个文件需要处理...")
 
         # 统计总的文件数、失败文件数、需要提醒的失败数
         failed_count = 0
@@ -589,9 +588,8 @@ class FileTransfer:
                 # 文件名
                 file_name = os.path.basename(file_item)
                 # 更新进度
-                self.progress.update(ptype="filetransfer",
-                                     value=round(
-                                         total_count/len(Medias) * 100) - (0.5/len(Medias) * 100),
+                self.progress.update(ptype=ProgressKey.FileTransfer,
+                                     value=round(total_count/len(Medias) * 100) - (0.5/len(Medias) * 100),
                                      text="正在处理：%s ..." % file_name)
 
                 # 数据库记录的路径
@@ -604,8 +602,7 @@ class FileTransfer:
                     log.warn("【Rmt】%s 无法识别媒体信息！" % file_name)
                     success_flag = False
                     error_message = "无法识别媒体信息"
-                    self.progress.update(
-                        ptype="filetransfer", text=error_message)
+                    self.progress.update(ptype=ProgressKey.FileTransfer, text=error_message)
                     if udf_flag:
                         return __finish_transfer(success_flag, error_message)
                     # 记录未识别
@@ -692,8 +689,7 @@ class FileTransfer:
                                 if ret != 0:
                                     success_flag = False
                                     error_message = "文件转移失败，错误码 %s" % ret
-                                    self.progress.update(
-                                        ptype="filetransfer", text=error_message)
+                                    self.progress.update(ptype=ProgressKey.FileTransfer, text=error_message)
                                     if udf_flag:
                                         return __finish_transfer(success_flag, error_message)
                                     failed_count += 1
@@ -717,8 +713,7 @@ class FileTransfer:
                                   file_item)
                         success_flag = False
                         error_message = "识别失败，无法从文件名中识别出季集信息"
-                        self.progress.update(
-                            ptype="filetransfer", text=error_message)
+                        self.progress.update(ptype=ProgressKey.FileTransfer, text=error_message)
                         if udf_flag:
                             return __finish_transfer(success_flag, error_message)
                         # 记录未识别
@@ -743,8 +738,7 @@ class FileTransfer:
                     if ret != 0:
                         success_flag = False
                         error_message = "蓝光目录转移失败，错误码：%s" % ret
-                        self.progress.update(
-                            ptype="filetransfer", text=error_message)
+                        self.progress.update(ptype=ProgressKey.FileTransfer, text=error_message)
                         if udf_flag:
                             return __finish_transfer(success_flag, error_message)
                         failed_count += 1
@@ -760,8 +754,7 @@ class FileTransfer:
                                       file_item)
                             success_flag = False
                             error_message = "识别失败，无法从文件名中识别出集数"
-                            self.progress.update(
-                                ptype="filetransfer", text=error_message)
+                            self.progress.update(ptype=ProgressKey.FileTransfer, text=error_message)
                             if udf_flag:
                                 return __finish_transfer(success_flag, error_message)
                             # 记录未识别
@@ -783,8 +776,7 @@ class FileTransfer:
                         if ret != 0:
                             success_flag = False
                             error_message = "文件转移失败，错误码 %s" % ret
-                            self.progress.update(
-                                ptype="filetransfer", text=error_message)
+                            self.progress.update(ptype=ProgressKey.FileTransfer, text=error_message)
                             if udf_flag:
                                 return __finish_transfer(success_flag, error_message)
                             failed_count += 1
@@ -833,9 +825,8 @@ class FileTransfer:
                                                file_name=os.path.basename(ret_file_path),
                                                file_ext=file_ext)
                 # 更新进度
-                self.progress.update(ptype="filetransfer",
-                                     value=round(
-                                         total_count / len(Medias) * 100),
+                self.progress.update(ptype=ProgressKey.FileTransfer,
+                                     value=round(total_count / len(Medias) * 100),
                                      text="%s 转移完成" % file_name)
                 # 移动模式随机休眠（兼容一些网盘挂载目录）
                 if rmt_mode == RmtMode.MOVE:
@@ -1175,11 +1166,11 @@ class FileTransfer:
         episode_title = self.media.get_episode_title(media)
         # 此处使用独立对象，避免影响语言
         en_title = Media().get_tmdb_en_title(media)
-        return {
+        media_format_dict = {
             "title": StringUtils.clear_file_name(media.title),
-            "en_title": StringUtils.clear_file_name(en_title),
-            "original_name": StringUtils.clear_file_name(os.path.splitext(media.org_string or "")[0]),
-            "original_title": StringUtils.clear_file_name(media.original_title),
+            "en_title": StringUtils.clear_file_name(en_title, is_en=True),
+            "original_name": StringUtils.clear_file_name(os.path.splitext(media.org_string or "")[0], is_en=True),
+            "original_title": StringUtils.clear_file_name(media.original_title, is_en=True),
             "name": StringUtils.clear_file_name(media.get_name()),
             "year": media.year,
             "edition": media.get_edtion_string() or None,
@@ -1196,6 +1187,10 @@ class FileTransfer:
             "season_episode": "%s%s" % (media.get_season_item(), media.get_episode_items()),
             "part": media.part
         }
+        for i in media_format_dict.keys():
+            if not media_format_dict[i]:
+                media_format_dict[i] = '\t'
+        return media_format_dict
 
     def get_moive_dest_path(self, media_info):
         """
@@ -1203,10 +1198,8 @@ class FileTransfer:
         :return: 电影目录、电影名称
         """
         format_dict = self.get_format_dict(media_info)
-        dir_name = re.sub(r"[-_\s.]*None", "",
-                          self._movie_dir_rmt_format.format(**format_dict))
-        file_name = re.sub(r"[-_\s.]*None", "",
-                           self._movie_file_rmt_format.format(**format_dict))
+        dir_name = re.sub(r"[-_\s.]*\t", "", self._movie_dir_rmt_format.format(**format_dict))
+        file_name = re.sub(r"[-_\s.]*\t", "", self._movie_file_rmt_format.format(**format_dict))
         return dir_name, file_name
 
     def get_tv_dest_path(self, media_info):
@@ -1215,12 +1208,9 @@ class FileTransfer:
         :return: 电视剧目录、季目录、集名称
         """
         format_dict = self.get_format_dict(media_info)
-        dir_name = re.sub(r"[-_\s.]*None", "",
-                          self._tv_dir_rmt_format.format(**format_dict))
-        season_name = re.sub(
-            r"[-_\s.]*None", "", self._tv_season_rmt_format.format(**format_dict))
-        file_name = re.sub(r"[-_\s.]*None", "",
-                           self._tv_file_rmt_format.format(**format_dict))
+        dir_name = re.sub(r"[-_\s.]*\t", "", self._tv_dir_rmt_format.format(**format_dict))
+        season_name = re.sub(r"[-_\s.]*\t", "", self._tv_season_rmt_format.format(**format_dict))
+        file_name = re.sub(r"[-_\s.]*\t", "", self._tv_file_rmt_format.format(**format_dict))
         return dir_name, season_name, file_name
 
     def check_ignore(self, file_list):

@@ -7,7 +7,7 @@ from app.message import Message
 from app.downloader import Downloader
 from app.media import Media
 from app.helper import ProgressHelper
-from app.utils.types import SearchType,EventType
+from app.utils.types import SearchType, EventType, ProgressKey
 from app.media.meta import MetaVideo
 
 
@@ -79,7 +79,7 @@ class Searcher:
             log.warn("【Searcher】没有设置用于订阅搜索的站点。")
             return None
         # 进度计数重置
-        self.progress.start('search')
+        self.progress.start(ProgressKey.Search)
         # 查找的季
         if media_info.begin_season is None:
             search_season = None
