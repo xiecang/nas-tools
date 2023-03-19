@@ -298,7 +298,7 @@ class _IIndexClient(metaclass=ABCMeta):
                         # TMDBID是否匹配
                         if str(media_info.tmdb_id) != str(match_media.tmdb_id):
                             log.info(
-                                f"【{self.client_name}】{torrent_name} 识别为 {media_info.type.value} {media_info.get_title_string()} 不匹配")
+                                f"【{self.client_name}】{torrent_name} {media_info.tmdb_id} 识别为 {media_info.type.value} {media_info.get_title_string()} 不匹配，需要的 TMDBID 为 {match_media.tmdb_id}")
                             index_match_fail += 1
                             continue
                         # 合并媒体数据

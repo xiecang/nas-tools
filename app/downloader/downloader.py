@@ -701,7 +701,7 @@ class Downloader:
             下载及发送通知
             """
             download_item.user_name = user_name
-            _, torrent_id, msg = self.download(
+            downloader_id, torrent_id, msg = self.download(
                 media_info=download_item,
                 download_dir=download_item.save_path,
                 download_setting=download_item.download_setting,
@@ -712,7 +712,7 @@ class Downloader:
                 self.message.send_download_message(in_from, download_item)
             else:
                 self.message.send_download_fail_message(download_item, msg)
-            return torrent_id
+            return downloader_id, torrent_id
 
         # 下载掉所有的电影
         if type == MediaType.MOVIE:
@@ -720,16 +720,20 @@ class Downloader:
                 if item.type == MediaType.TV:
                     continue
                 if over_edition:
-                    if item.res_order > res_order and __download(item):
-                        return_items.append(item)
+                    if item.res_order > res_order:
+                        _, download_id = __download(item)
+                        if download_id:
+                            return_items.append(item)
                         break
-                elif __download(item):
-                    return_items.append(item)
+                else:
+                    _, download_id = __download(item)
+                    if download_id:
+                        return_items.append(item)
                     break
             return return_items, {}
 
         if not need_tvs:
-            return
+            return return_items, {}
 
         # 处理剧集
         need_season = need_tvs.get('season')
@@ -744,7 +748,7 @@ class Downloader:
                 need_episodes = [e for e, o in need_tvs.get(
                     "episode_filter_orders").items() if o <= 0 or over_edition]
                 if not need_episodes:
-                    return
+                    continue
                 if item.type == MediaType.MOVIE:
                     continue
                 if item.get_episode_list():
@@ -760,7 +764,7 @@ class Downloader:
                         url=item.enclosure,
                         page_url=item.page_url)
                     if not torrent_episodes or len(torrent_episodes) >= total_episodes:
-                        download_state = __download(
+                        _, download_state = __download(
                             download_item=item, torrent_file=torrent_path)
                     else:
                         log.info(
@@ -768,7 +772,7 @@ class Downloader:
                         continue
                 else:
                     # 多季的话就都下载了？
-                    download_state = __download(item)
+                    _, download_state = __download(item)
                 if download_state:
                     # 更新仍需季集
                     need_tvs['episode_filter_orders'] = {
@@ -784,7 +788,7 @@ class Downloader:
                 "episode_filter_orders").items() if o == 0 or over_edition]
 
             if not need_episodes:
-                return
+                continue
             item_season = item.get_season_list()
             if len(item_season) != 1 or item_season[0] != need_season:
                 continue
@@ -794,7 +798,8 @@ class Downloader:
             if over_edition and any(item.res_order <= need_tvs.get('episode_filter_orders').get(e) for e in item.get_episode_list()):
                 continue
             if set(item_episodes).issubset(set(need_episodes)):
-                if __download(item):
+                _, download_id = __download(item)
+                if download_id:
                     need_tvs['episode_filter_orders'].update(
                         {k: item.res_order for k in item_episodes})
                     return_items.append(item)
@@ -805,7 +810,7 @@ class Downloader:
             need_episodes = [e for e, o in need_tvs.get(
                 "episode_filter_orders").items() if o <= 0 or over_edition]
             if not need_episodes:
-                return
+                continue
             if len(item_season) != 1 or item_season[0] != need_season:
                 continue
             torrent_episodes, torrent_path = self.get_torrent_episodes(
@@ -820,21 +825,12 @@ class Downloader:
                 log.info("【Downloader】%s 没有需要的集，跳过..." %
                          item.org_string)
                 continue
-            ret = __download(download_item=item,
-                             torrent_file=torrent_path,
-                             is_paused=True)
+            downloader_id, ret = __download(download_item=item,
+                                            torrent_file=torrent_path,
+                                            is_paused=True)
             if not ret:
                 continue
             return_items.append(item)
-            # 获取下载器
-            downloader = self._default_client_type
-            if item.download_setting:
-                download_attr = self.get_download_setting(
-                    item.download_setting)
-                if download_attr.get("downloader"):
-                    downloader = self.__get_client_type(
-                        download_attr.get("downloader"))
-            _client = self.__get_client(downloader)
             torrent_id = ret
             if not torrent_id:
                 log.error("【Downloader】获取下载器添加的任务信息出错：%s，id=%s" % (
@@ -842,13 +838,13 @@ class Downloader:
                 continue
             # 设置任务只下载想要的文件
             log.info("【Downloader】从 %s 中选取集：%s, torrent id: %s, downloader: %s" %
-                     (item.org_string, selected_episodes, torrent_id, downloader))
+                     (item.org_string, selected_episodes, torrent_id, downloader_id))
             select_succeed = self.set_files_status(
-                torrent_id, selected_episodes, downloader)
+                torrent_id, selected_episodes, downloader_id)
             if select_succeed:
                 # 重新开始任务
                 log.info("【Downloader】%s 开始下载 " % item.org_string)
-                _client.start_torrents(torrent_id)
+                self.start_torrents(ids=torrent_id, downloader_id=downloader_id)
                 need_tvs['episode_filter_orders'].update(
                     {k: item.res_order for k in selected_episodes})
             else:
