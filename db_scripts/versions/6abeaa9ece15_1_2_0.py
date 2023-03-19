@@ -168,6 +168,17 @@ def upgrade() -> None:
             batch_op.add_column(sa.Column('MATCH_PATH', sa.Integer))
     except Exception as e:
         pass
+
+    try:
+        with op.batch_alter_table("DOUBAN_MEDIAS") as batch_op:
+            op.add_column(sa.Column('MARK_DATE', sa.Text(), nullable=True))
+    except Exception as e:
+        pass
+    try:
+        with op.batch_alter_table("RSS_TV_EPISODES") as batch_op:
+            op.add_column(sa.Column('EPISODE_FILTER_ORDERS', sa.Text(), nullable=True))
+    except Exception as e:
+        pass
     # ### end Alembic commands ###
 
 
