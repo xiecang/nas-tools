@@ -1092,7 +1092,7 @@ class Downloader:
                         set(need_episodes)):
                     file_ids.append(file_id)
                 else:
-                    download_file_ids.append(torrent_file.get("index"))
+                    download_file_ids.append(file_id)
                     sucess_epidised = list(set(sucess_epidised).union(
                         set(meta_info.get_episode_list())))
             if sucess_epidised and file_ids:
