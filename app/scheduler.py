@@ -9,6 +9,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.events import EVENT_JOB_ERROR
 
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.util import undefined
 
 import log
 from app.doubansync import DoubanSync
@@ -162,7 +163,7 @@ class Scheduler:
     def listener(self, event):
         log.debug("【Exception】定时任务执行异常，错误: " + "".join(traceback.format_exception(event.exception)))
 
-    def start_job(self, func, func_desc, cron, next_run_time=None):
+    def start_job(self, func, func_desc, cron, next_run_time=undefined):
         """
         解析任务的定时规则,启动定时服务
         :param func: 可调用的一个函数,在指定时间运行
