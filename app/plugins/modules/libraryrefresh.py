@@ -4,8 +4,6 @@ from app.plugins.modules._base import _IPluginModule
 from app.utils.types import EventType
 import log
 
-import log
-
 
 class LibraryRefresh(_IPluginModule):
     # 插件名称
@@ -80,7 +78,7 @@ class LibraryRefresh(_IPluginModule):
         year = media_info.get("year")
         media_name = f"{title} ({year})" if year else title
         mediaserver_type = self.mediaserver.get_type().value
-        log.info(f"【Plugin】媒体服务器 {mediaserver_type} 刷新媒体 {media_name}")
+        self.info(f"媒体服务器 {mediaserver_type} 刷新媒体 {media_name}")
         self.mediaserver.refresh_library_by_items([{
             "title": title,
             "year": year,

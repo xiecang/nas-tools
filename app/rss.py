@@ -13,7 +13,7 @@ from app.sites import Sites, SiteConf
 from app.subscribe import Subscribe
 from app.utils import DomUtils, RequestUtils, StringUtils, ExceptionUtils, RssTitleUtils, Torrent
 from app.utils.types import MediaType, SearchType
-from collections import defaultdict
+from config import Config
 
 lock = Lock()
 
@@ -237,8 +237,8 @@ class Rss:
             for rid, item in rss_items.items():
                 self.subscribe.subscribe_media(item['match_info'], item['media_list'], item['no_exists'])
 
-    @ staticmethod
-    def parse_rssxml(url):
+    @staticmethod
+    def parse_rssxml(url, proxy=False):
         """
         解析RSS订阅URL，获取RSS中的种子信息
         :param url: RSS地址
@@ -254,7 +254,7 @@ class Rss:
             return []
         site_domain = StringUtils.get_url_domain(url)
         try:
-            ret = RequestUtils().get_res(url)
+            ret = RequestUtils(proxies=Config().get_proxies() if proxy else None).get_res(url)
             if not ret:
                 return []
             ret.encoding = ret.apparent_encoding
