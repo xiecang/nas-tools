@@ -950,9 +950,9 @@ class Subscribe:
             if local_no_exists:
                 local_no_exists = local_no_exists[0]
                 rss_no_exists['episode_filter_orders'].update({e: 1 for e, o in rss_no_exists['episode_filter_orders'].items() if o == 0 and e not in local_no_exists['episodes']})
+                rss_no_exists['episode_filter_orders'].update({e: 0 for e in local_no_exists['episodes'] if e not in rss_no_exists['episode_filter_orders']})
             else:
                 rss_no_exists['episode_filter_orders'].update({e: 1 for e, o in rss_no_exists['episode_filter_orders'].items() if o == 0})
-            rss_no_exists['episode_filter_orders'].update({e: 0 for e in local_no_exists['episodes'] if e not in rss_no_exists['episode_filter_orders']})
             # 更新本地和媒体库标记
             log.info("【Subscribe】订阅电视剧 %s %s 当前缺失集数为 %s，当前各集版本优先级Index为 %s" % (
                 rss_info.get('name'),
