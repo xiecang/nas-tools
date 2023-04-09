@@ -568,7 +568,8 @@ class DbHelper:
         return self._db.query(CONFIGSITE).filter(CONFIGSITE.NAME == name).all()
 
     @DbPersist(_db)
-    def insert_config_site(self, name, site_pri, rssurl, signurl, cookie, note, rss_uses):
+    def insert_config_site(self, name, site_pri,
+                           rssurl=None, signurl=None, cookie=None, note=None, rss_uses=None):
         """
         插入站点信息
         """
@@ -791,6 +792,8 @@ class DbHelper:
                          filter_pix=None,
                          filter_team=None,
                          filter_rule=None,
+                         filter_include=None,
+                         filter_exclude=None,
                          save_path=None,
                          download_setting=-1,
                          fuzzy_match=0,
@@ -822,6 +825,8 @@ class DbHelper:
             FILTER_PIX=filter_pix,
             FILTER_RULE=filter_rule,
             FILTER_TEAM=filter_team,
+            FILTER_INCLUDE=filter_include,
+            FILTER_EXCLUDE=filter_exclude,
             SAVE_PATH=save_path,
             DOWNLOAD_SETTING=download_setting,
             FUZZY_MATCH=fuzzy_match,
@@ -987,6 +992,8 @@ class DbHelper:
                       filter_pix=None,
                       filter_team=None,
                       filter_rule=None,
+                      filter_include=None,
+                      filter_exclude=None,
                       save_path=None,
                       download_setting=-1,
                       total_ep=None,
@@ -1026,6 +1033,8 @@ class DbHelper:
             FILTER_PIX=filter_pix,
             FILTER_RULE=filter_rule,
             FILTER_TEAM=filter_team,
+            FILTER_INCLUDE=filter_include,
+            FILTER_EXCLUDE=filter_exclude,
             SAVE_PATH=save_path,
             DOWNLOAD_SETTING=download_setting,
             FUZZY_MATCH=fuzzy_match,
@@ -1729,6 +1738,7 @@ class DbHelper:
                 INTEVAL=item.get('interval'),
                 DOWNLOADER=item.get('downloader'),
                 LABEL=item.get('label'),
+                SAVEPATH=item.get('savepath'),
                 TRANSFER=item.get('transfer'),
                 DOWNLOAD_COUNT=0,
                 REMOVE_COUNT=0,
@@ -1751,6 +1761,7 @@ class DbHelper:
                     "INTEVAL": item.get('interval'),
                     "DOWNLOADER": item.get('downloader'),
                     "LABEL": item.get('label'),
+                    "SAVEPATH": item.get('savepath'),
                     "TRANSFER": item.get('transfer'),
                     "STATE": item.get('state'),
                     "LST_MOD_DATE": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())),

@@ -43,7 +43,7 @@ sync = Apiv1.namespace('sync', description='目录同步')
 filterrule = Apiv1.namespace('filterrule', description='过滤规则')
 words = Apiv1.namespace('words', description='识别词')
 message = Apiv1.namespace('message', description='消息通知')
-douban = Apiv1.namespace('douban', description='豆瓣')
+plugin = Apiv1.namespace('plugin', description='插件')
 
 
 class ApiResource(Resource):
@@ -220,7 +220,7 @@ class ServiceNetworkTest(ClientResource):
 class ServiceRun(ClientResource):
     parser = reqparse.RequestParser()
     parser.add_argument('item', type=str,
-                        help='服务名称（autoremovetorrents、pttransfer、ptsignin、sync、rssdownload、douban、subscribe_search_all）',
+                        help='服务名称（autoremovetorrents、pttransfer、ptsignin、sync、rssdownload、subscribe_search_all）',
                         location='form',
                         required=True)
 
@@ -1125,8 +1125,8 @@ class SubscribeAdd(ClientResource):
     parser.add_argument('rssid', type=int, help='已有订阅ID', location='form')
     parser.add_argument('mediaid', type=str, help='TMDBID/DB:豆瓣ID', location='form')
     parser.add_argument('fuzzy_match', type=int, help='模糊匹配（0-否/1-是）', location='form')
-    parser.add_argument('rss_sites', type=list, help='RSS站点', location='form')
-    parser.add_argument('search_sites', type=list, help='搜索站点', location='form')
+    parser.add_argument('rss_sites', type=str, help='RSS站点（,号分隔）', location='form')
+    parser.add_argument('search_sites', type=str, help='搜索站点（,号分隔）', location='form')
     parser.add_argument('over_edition', type=int, help='洗版（0-否/1-是）', location='form')
     parser.add_argument('filter_restype', type=str, help='资源类型', location='form')
     parser.add_argument('filter_pix', type=str, help='分辨率', location='form')
@@ -2271,36 +2271,62 @@ class TorrentRemoverTaskUpdate(ClientResource):
         return WebAction().api_action(cmd='update_torrent_remove_task', data=self.parser.parse_args())
 
 
-@douban.route('/history/list')
-class DoubanHistoryList(ClientResource):
-
-    @staticmethod
-    def post():
-        """
-        查询豆瓣同步历史记录
-        """
-        return WebAction().api_action(cmd='get_douban_history')
-
-
-@douban.route('/history/delete')
-class DoubanHistoryDelete(ClientResource):
+@plugin.route('/install')
+class PluginInstall(ClientResource):
     parser = reqparse.RequestParser()
-    parser.add_argument('id', type=int, help='ID', location='form', required=True)
+    parser.add_argument('id', type=int, help='插件ID', location='form', required=True)
 
-    @douban.doc(parser=parser)
+    @plugin.doc(parser=parser)
     def post(self):
         """
-        删除豆瓣同步历史记录
+        安装插件
         """
-        return WebAction().api_action(cmd='delete_douban_history', data=self.parser.parse_args())
+        return WebAction().api_action(cmd='install_plugin', data=self.parser.parse_args())
 
 
-@douban.route('/run')
-class DoubanRun(ClientResource):
+@plugin.route('/uninstall')
+class PluginUninstall(ClientResource):
+    parser = reqparse.RequestParser()
+    parser.add_argument('id', type=int, help='插件ID', location='form', required=True)
+
+    @plugin.doc(parser=parser)
+    def post(self):
+        """
+        卸载插件
+        """
+        return WebAction().api_action(cmd='uninstall_plugin', data=self.parser.parse_args())
+
+
+@plugin.route('/apps')
+class PluginApps(ClientResource):
     @staticmethod
+    @plugin.doc()
     def post():
         """
-        立即同步豆瓣数据
+        获取插件市场所有插件
         """
-        # 返回站点信息
-        return WebAction().api_action(cmd='sch', data={"item": "douban"})
+        return WebAction().api_action(cmd='get_plugin_apps')
+
+
+@plugin.route('/list')
+class PluginList(ClientResource):
+    @staticmethod
+    @plugin.doc()
+    def post():
+        """
+        获取已安装插件
+        """
+        return WebAction().api_action(cmd='get_plugins_conf')
+
+
+@plugin.route('/status')
+class PluginStatus(ClientResource):
+    parser = reqparse.RequestParser()
+    parser.add_argument('id', type=int, help='插件ID', location='form', required=True)
+
+    @plugin.doc(parser=parser)
+    def post(self):
+        """
+        获取插件运行状态
+        """
+        return WebAction().api_action(cmd='get_plugin_state', data=self.parser.parse_args())

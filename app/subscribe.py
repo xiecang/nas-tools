@@ -69,6 +69,8 @@ class Subscribe:
                           filter_pix=None,
                           filter_team=None,
                           filter_rule=None,
+                          filter_include=None,
+                          filter_exclude=None,
                           save_path=None,
                           download_setting=None,
                           total_ep=None,
@@ -94,6 +96,8 @@ class Subscribe:
         :param filter_pix: 分辨率过滤
         :param filter_team: 制作组/字幕组过滤
         :param filter_rule: 关键字过滤
+        :param filter_include: 包含关键字
+        :param filter_exclude: 排除关键字
         :param save_path: 保存路径
         :param download_setting: 下载设置
         :param state: 添加订阅时的状态
@@ -108,7 +112,11 @@ class Subscribe:
             return -1, "标题或类型有误", None
         year = int(year) if str(year).isdigit() else ""
         rss_sites = rss_sites or []
+        if isinstance(rss_sites, str):
+            rss_sites = rss_sites.split(",")
         search_sites = search_sites or []
+        if isinstance(search_sites, str):
+            search_sites = search_sites.split(",")
         over_edition = 1 if over_edition else 0
         filter_rule = int(filter_rule) if str(filter_rule).isdigit() else None
         total_ep = int(total_ep) if str(total_ep).isdigit() else None
@@ -123,6 +131,8 @@ class Subscribe:
                 default_pix = default_rss_setting.get('pix')
                 default_team = default_rss_setting.get('team')
                 default_rule = default_rss_setting.get('rule')
+                default_include = default_rss_setting.get('include')
+                default_exclude = default_rss_setting.get('exclude')
                 default_download_setting = default_rss_setting.get('download_setting')
                 default_over_edition = default_rss_setting.get('over_edition')
                 default_rss_sites = default_rss_setting.get('rss_sites')
@@ -135,6 +145,10 @@ class Subscribe:
                     filter_team = default_team
                 if not filter_rule and default_rule:
                     filter_rule = int(default_rule) if str(default_rule).isdigit() else None
+                if not filter_include and default_include:
+                    filter_include = default_include
+                if not filter_exclude and default_exclude:
+                    filter_exclude = default_exclude
                 if not over_edition and default_over_edition:
                     over_edition = 1 if default_over_edition == "1" else 0
                 if not download_setting and default_download_setting:
@@ -209,6 +223,8 @@ class Subscribe:
                                                    filter_pix=filter_pix,
                                                    filter_team=filter_team,
                                                    filter_rule=filter_rule,
+                                                   filter_include=filter_include,
+                                                   filter_exclude=filter_exclude,
                                                    save_path=save_path,
                                                    download_setting=download_setting,
                                                    total_ep=total_ep,
@@ -232,6 +248,8 @@ class Subscribe:
                                                       filter_pix=filter_pix,
                                                       filter_team=filter_team,
                                                       filter_rule=filter_rule,
+                                                      filter_include=filter_include,
+                                                      filter_exclude=filter_exclude,
                                                       save_path=save_path,
                                                       download_setting=download_setting,
                                                       fuzzy_match=0,
@@ -258,6 +276,8 @@ class Subscribe:
                                                       filter_pix=filter_pix,
                                                       filter_team=filter_team,
                                                       filter_rule=filter_rule,
+                                                      filter_include=filter_include,
+                                                      filter_exclude=filter_exclude,
                                                       save_path=save_path,
                                                       download_setting=download_setting,
                                                       fuzzy_match=1,
@@ -276,6 +296,8 @@ class Subscribe:
                                                    filter_pix=filter_pix,
                                                    filter_team=filter_team,
                                                    filter_rule=filter_rule,
+                                                   filter_include=filter_include,
+                                                   filter_exclude=filter_exclude,
                                                    save_path=save_path,
                                                    download_setting=download_setting,
                                                    fuzzy_match=1,
@@ -406,6 +428,8 @@ class Subscribe:
             filter_pix = rss_movie.FILTER_PIX
             filter_team = rss_movie.FILTER_TEAM
             filter_rule = rss_movie.FILTER_RULE
+            filter_include = rss_movie.FILTER_INCLUDE
+            filter_exclude = rss_movie.FILTER_EXCLUDE
             download_setting = rss_movie.DOWNLOAD_SETTING
             save_path = rss_movie.SAVE_PATH
             fuzzy_match = True if rss_movie.FUZZY_MATCH == 1 else False
@@ -445,7 +469,12 @@ class Subscribe:
                 "filter_pix": filter_pix,
                 "filter_team": filter_team,
                 "filter_rule": filter_rule,
+                << << << < HEAD
                 "filter_order": rss_movie.FILTER_ORDER,
+                == == == =
+                "filter_include": filter_include,
+                "filter_exclude": filter_exclude,
+                >>>>>> > v3.1.4
                 "save_path": save_path,
                 "download_setting": download_setting,
                 "fuzzy_match": fuzzy_match,
@@ -476,6 +505,8 @@ class Subscribe:
             filter_pix = rss_tv.FILTER_PIX
             filter_team = rss_tv.FILTER_TEAM
             filter_rule = rss_tv.FILTER_RULE
+            filter_include = rss_tv.FILTER_INCLUDE
+            filter_exclude = rss_tv.FILTER_EXCLUDE
             download_setting = rss_tv.DOWNLOAD_SETTING
             save_path = rss_tv.SAVE_PATH
             total_ep = rss_tv.TOTAL_EP
@@ -493,6 +524,8 @@ class Subscribe:
                 filter_pix = desc.get("pix")
                 filter_team = desc.get("team")
                 filter_rule = desc.get("rule")
+                filter_include = desc.get("include")
+                filter_exclude = desc.get("exclude")
                 save_path = ""
                 download_setting = ""
                 total_ep = desc.get("total")
@@ -520,7 +553,8 @@ class Subscribe:
                 "filter_pix": filter_pix,
                 "filter_team": filter_team,
                 "filter_rule": filter_rule,
-                "filter_order": rss_tv.FILTER_ORDER,
+                "filter_include": filter_include,
+                "filter_exclude": filter_exclude,
                 "save_path": save_path,
                 "download_setting": download_setting,
                 "total": rss_tv.TOTAL,
@@ -736,6 +770,8 @@ class Subscribe:
                 "pix": rss_info.get('filter_pix'),
                 "team": rss_info.get('filter_team'),
                 "rule": rss_info.get('filter_rule'),
+                "include": rss_info.get('filter_include'),
+                "exclude": rss_info.get('filter_exclude'),
                 "site": rss_info.get("search_sites")
             }
             search_result = self.searcher.search_one_media(
@@ -803,6 +839,8 @@ class Subscribe:
                 "pix": rss_info.get('filter_pix'),
                 "team": rss_info.get('filter_team'),
                 "rule": rss_info.get('filter_rule'),
+                "include": rss_info.get('filter_include'),
+                "exclude": rss_info.get('filter_exclude'),
                 "site": rss_info.get("search_sites")
             }
             search_result = self.searcher.search_one_media(

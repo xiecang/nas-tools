@@ -17,14 +17,13 @@ from werkzeug.security import generate_password_hash
 import log
 from app.brushtask import BrushTask
 from app.conf import SystemConfig, ModuleConf
-from app.doubansync import DoubanSync
 from app.downloader import Downloader
 from app.filetransfer import FileTransfer
 from app.filter import Filter
 from app.helper import DbHelper, ProgressHelper, ThreadHelper, \
-    MetaHelper, DisplayHelper, WordsHelper, CookieCloudHelper, IndexerHelper
+    MetaHelper, DisplayHelper, WordsHelper, IndexerHelper
 from app.indexer import Indexer
-from app.media import Category, Media, Bangumi, DouBan
+from app.media import Category, Media, Bangumi, DouBan, Scraper
 from app.media.meta import MetaInfo, MetaBase
 from app.mediaserver import MediaServer
 from app.message import Message, MessageCenter
@@ -447,13 +446,12 @@ class WebAction:
             "delete_torrent_remove_task": self.__delete_torrent_remove_task,
             "get_remove_torrents": self.__get_remove_torrents,
             "auto_remove_torrents": self.__auto_remove_torrents,
-            "get_douban_history": self.get_douban_history,
+            "douban_sync": self.douban_sync,
             "delete_douban_history": self.__delete_douban_history,
             "list_brushtask_torrents": self.__list_brushtask_torrents,
             "set_system_config": self.__set_system_config,
             "get_site_user_statistics": self.get_site_user_statistics,
             "send_custom_message": self.send_custom_message,
-            "cookiecloud_sync": self.__cookiecloud_sync,
             "media_detail": self.media_detail,
             "media_similar": self.__media_similar,
             "media_recommendations": self.__media_recommendations,
@@ -477,6 +475,12 @@ class WebAction:
             "get_movie_rss_items": self.get_movie_rss_items,
             "get_tv_rss_items": self.get_tv_rss_items,
             "get_ical_events": self.get_ical_events,
+            "install_plugin": self.install_plugin,
+            "uninstall_plugin": self.uninstall_plugin,
+            "get_plugin_apps": self.get_plugin_apps,
+            "get_plugin_page": self.get_plugin_page,
+            "get_plugin_state": self.get_plugin_state,
+            "get_plugins_conf": self.get_plugins_conf
         }
 
     def action(self, cmd, data=None):
@@ -584,7 +588,7 @@ class WebAction:
             "/pts": {"func": SiteSignin().signin, "desp": "站点签到"},
             "/rst": {"func": Sync().transfer_all_sync, "desp": "目录同步"},
             "/rss": {"func": Rss().rssdownload, "desp": "RSS订阅"},
-            "/db": {"func": DoubanSync().sync, "desp": "豆瓣同步"},
+            "/db": {"func": WebAction().douban_sync, "desp": "豆瓣同步"},
             "/ssa": {"func": Subscribe().subscribe_search_all, "desp": "订阅搜索"},
             "/tbl": {"func": WebAction().truncate_blacklist, "desp": "清理转移缓存"},
             "/trh": {"func": WebAction().truncate_rsshistory, "desp": "清理RSS缓存"},
@@ -741,7 +745,7 @@ class WebAction:
             "ptsignin": SiteSignin().signin,
             "sync": Sync().transfer_all_sync,
             "rssdownload": Rss().rssdownload,
-            "douban": DoubanSync().sync,
+            "douban": WebAction().douban_sync,
             "subscribe_search_all": Subscribe().subscribe_search_all,
         }
         sch_item = data.get("item")
@@ -1651,6 +1655,8 @@ class WebAction:
         filter_pix = data.get("filter_pix")
         filter_team = data.get("filter_team")
         filter_rule = data.get("filter_rule")
+        filter_include = data.get("filter_include")
+        filter_exclude = data.get("filter_exclude")
         save_path = data.get("save_path")
         download_setting = data.get("download_setting")
         total_ep = data.get("total_ep")
@@ -1680,6 +1686,8 @@ class WebAction:
                                                                      filter_pix=filter_pix,
                                                                      filter_team=filter_team,
                                                                      filter_rule=filter_rule,
+                                                                     filter_include=filter_include,
+                                                                     filter_exclude=filter_exclude,
                                                                      save_path=save_path,
                                                                      download_setting=download_setting,
                                                                      rssid=rssid)
@@ -1701,6 +1709,8 @@ class WebAction:
                                                                  filter_pix=filter_pix,
                                                                  filter_team=filter_team,
                                                                  filter_rule=filter_rule,
+                                                                 filter_include=filter_include,
+                                                                 filter_exclude=filter_exclude,
                                                                  save_path=save_path,
                                                                  download_setting=download_setting,
                                                                  total_ep=total_ep,
@@ -2182,6 +2192,7 @@ class WebAction:
         brushtask_state = data.get("brushtask_state")
         brushtask_rssurl = data.get("brushtask_rssurl")
         brushtask_label = data.get("brushtask_label")
+        brushtask_savepath = data.get("brushtask_savepath")
         brushtask_transfer = 'Y' if data.get("brushtask_transfer") else 'N'
         brushtask_sendmessage = 'Y' if data.get(
             "brushtask_sendmessage") else 'N'
@@ -2233,6 +2244,7 @@ class WebAction:
             "downloader": brushtask_downloader,
             "seed_size": brushtask_totalsize,
             "label": brushtask_label,
+            "savepath": brushtask_savepath,
             "transfer": brushtask_transfer,
             "state": brushtask_state,
             "rss_rule": rss_rule,
@@ -2611,6 +2623,7 @@ class WebAction:
             mtype = MediaType.MOVIE if SubType in MovieTypes else MediaType.TV
             # 过滤参数 with_genres with_original_language
             params = data.get("params") or {}
+
             res_list = Media().get_tmdb_discover(mtype=mtype, page=CurrentPage, params=params)
         elif Type == "DOUBANTAG":
             # 豆瓣发现
@@ -4323,11 +4336,10 @@ class WebAction:
         """
         刮削媒体文件夹或文件
         """
-        # 触发字幕下载事件
-        EventManager().send_event(EventType.MediaScrapStart, {
-            "path": data.get("path"),
-            "force": True
-        })
+        path = data.get("path")
+        if not path:
+            return {"code": -1, "msg": "请指定刮削路径"}
+        ThreadHelper().start_thread(Scraper().folder_scraper, (path, None, 'force_all'))
         return {"code": 0, "msg": "刮削任务已提交，正在后台运行。"}
 
     @staticmethod
@@ -4704,51 +4716,6 @@ class WebAction:
             "value": value,
             "name": name.value
         } for value, name in RmtModes.items()]
-
-    def __cookiecloud_sync(self, data):
-        """
-        CookieCloud数据同步
-        """
-        server = data.get("server")
-        key = data.get("key")
-        password = data.get("password")
-        # 保存设置
-        SystemConfig().set_system_config(key=SystemConfigKey.CookieCloud,
-                                         value={
-                                             "server": server,
-                                             "key": key,
-                                             "password": password
-                                         })
-        # 同步数据
-        contents, retmsg = CookieCloudHelper(server=server,
-                                             key=key,
-                                             password=password).download_data()
-        if not contents:
-            return {"code": 1, "msg": retmsg}
-        # 整理数据,使用domain域名的最后两级作为分组依据
-        domain_groups = defaultdict(list)
-        for site, cookies in contents.items():
-            for cookie in cookies:
-                domain_parts = cookie["domain"].split(".")[-2:]
-                domain_key = tuple(domain_parts)
-                domain_groups[domain_key].append(cookie)
-        success_count = 0
-        for domain, content_list in domain_groups.items():
-            if not content_list:
-                continue
-            cookie_str = ";".join(
-                [f"{content['name']}={content['value']}" for content in content_list]
-            )
-            site_info = Sites().get_sites_by_suffix(".".join(domain))
-            if site_info:
-                self.dbhelper.update_site_cookie_ua(tid=site_info.get("id"),
-                                                    cookie=cookie_str)
-                success_count += 1
-        if success_count:
-            # 重载站点信息
-            Sites().init_config()
-            return {"code": 0, "msg": f"成功更新 {success_count} 个站点的Cookie数据"}
-        return {"code": 0, "msg": "同步完成，但未更新任何站点的Cookie！"}
 
     def media_detail(self, data):
         """
@@ -5223,3 +5190,81 @@ class WebAction:
                         Events.append(info)
 
         return {"code": 0, "result": Events}
+
+    @staticmethod
+    def install_plugin(data):
+        """
+        安装插件
+        """
+        module_id = data.get("id")
+        if not module_id:
+            return {"code": -1, "msg": "参数错误"}
+        # 用户已安装插件列表
+        user_plugins = SystemConfig().get_system_config(SystemConfigKey.UserInstalledPlugins) or []
+        if module_id not in user_plugins:
+            user_plugins.append(module_id)
+        # 保存配置
+        SystemConfig().set_system_config(SystemConfigKey.UserInstalledPlugins, user_plugins)
+        # 重新加载插件
+        PluginManager().init_config()
+        return {"code": 0, "msg": "插件安装成功"}
+
+    @staticmethod
+    def uninstall_plugin(data):
+        """
+        卸载插件
+        """
+        module_id = data.get("id")
+        if not module_id:
+            return {"code": -1, "msg": "参数错误"}
+        # 用户已安装插件列表
+        user_plugins = SystemConfig().get_system_config(SystemConfigKey.UserInstalledPlugins) or []
+        if module_id in user_plugins:
+            user_plugins.remove(module_id)
+        # 保存配置
+        SystemConfig().set_system_config(SystemConfigKey.UserInstalledPlugins, user_plugins)
+        # 重新加载插件
+        PluginManager().init_config()
+        return {"code": 0, "msg": "插件卸载功"}
+
+    @staticmethod
+    def get_plugin_apps(data=None):
+        """
+        获取插件列表
+        """
+        return {"code": 0, "result": PluginManager().get_plugin_apps(current_user.level)}
+
+    @staticmethod
+    def get_plugin_page(data):
+        """
+        查询插件的额外数据
+        """
+        plugin_id = data.get("id")
+        if not plugin_id:
+            return {"code": 1, "msg": "参数错误"}
+        title, content = PluginManager().get_plugin_page(pid=plugin_id)
+        return {"code": 0, "title": title, "content": content}
+
+    @staticmethod
+    def get_plugin_state(data):
+        """
+        获取插件状态
+        """
+        plugin_id = data.get("id")
+        if not plugin_id:
+            return {"code": 1, "msg": "参数错误"}
+        state = PluginManager().get_plugin_state(plugin_id)
+        return {"code": 0, "state": state}
+
+    @staticmethod
+    def get_plugins_conf(data=None):
+        Plugins = PluginManager().get_plugins_conf(current_user.level)
+        return {"code": 0, "result": Plugins}
+
+    @staticmethod
+    def douban_sync(data=None):
+        """
+        启动豆瓣同步
+        """
+        # 触发事件
+        EventManager().send_event(EventType.DoubanSync, {})

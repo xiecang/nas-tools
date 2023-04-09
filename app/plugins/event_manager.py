@@ -47,7 +47,7 @@ class EventManager:
             self._handlers[etype.value] = handlerList
         if handler not in handlerList:
             handlerList.append(handler)
-            log.info(f"已注册事件：{etype.value}{handler}")
+            log.debug(f"已注册事件：{etype.value}{handler}")
 
     def remove_event_listener(self, etype: EventType, handler):
         """
@@ -82,6 +82,9 @@ class EventManager:
         def decorator(f):
             if isinstance(etype, list):
                 for et in etype:
+                    self.add_event_listener(et, f)
+            elif type(etype) == type(EventType):
+                for et in etype.__members__.values():
                     self.add_event_listener(et, f)
             else:
                 self.add_event_listener(etype, f)
