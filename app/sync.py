@@ -165,6 +165,7 @@ class Sync(object):
         :param text: 事件描述
         :param event_path: 事件文件路径
         """
+        log.debug("【Sync】文件%s：%s" % (text, event_path))
         if not event.is_directory:
             # 文件发生变化
             try:

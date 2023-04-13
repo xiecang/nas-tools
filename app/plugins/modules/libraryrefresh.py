@@ -7,10 +7,6 @@ from app.mediaserver import MediaServer
 from app.plugins import EventHandler
 from app.plugins.modules._base import _IPluginModule
 from app.utils.types import EventType
-<< << << < HEAD
-== == == =
-
->>>>>> > v3.1.4
 
 
 class LibraryRefresh(_IPluginModule):

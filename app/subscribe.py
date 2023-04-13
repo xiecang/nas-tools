@@ -469,12 +469,8 @@ class Subscribe:
                 "filter_pix": filter_pix,
                 "filter_team": filter_team,
                 "filter_rule": filter_rule,
-                << << << < HEAD
-                "filter_order": rss_movie.FILTER_ORDER,
-                == == == =
                 "filter_include": filter_include,
                 "filter_exclude": filter_exclude,
-                >>>>>> > v3.1.4
                 "save_path": save_path,
                 "download_setting": download_setting,
                 "fuzzy_match": fuzzy_match,

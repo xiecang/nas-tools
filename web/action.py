@@ -287,12 +287,6 @@ class WebAction:
                     "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-server-cog" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M3 4m0 3a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3z"></path>\n                                <path d="M12 20h-6a3 3 0 0 1 -3 -3v-2a3 3 0 0 1 3 -3h10.5"></path>\n                                <path d="M18 18m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"></path>\n                                <path d="M18 14.5v1.5"></path>\n                                <path d="M18 20v1.5"></path>\n                                <path d="M21.032 16.25l-1.299 .75"></path>\n                                <path d="M16.27 19l-1.3 .75"></path>\n                                <path d="M14.97 16.25l1.3 .75"></path>\n                                <path d="M19.733 19l1.3 .75"></path>\n                                <path d="M7 8v.01"></path>\n                                <path d="M7 16v.01"></path>\n                              </svg>\n                            ',
                 },
                 {
-                    "name": "豆瓣",
-                    "level": 2,
-                    "page": "douban",
-                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-douban" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M4 20h16"></path>\n                                <path d="M5 4h14"></path>\n                                <path d="M8 8h8a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2v-2a2 2 0 0 1 2 -2z"></path>\n                                <path d="M16 14l-2 6"></path>\n                                <path d="M8 17l1 3"></path>\n                              </svg>\n                            ',
-                },
-                {
                     "name": "插件",
                     "level": 1,
                     "page": "plugin",
