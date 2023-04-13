@@ -536,8 +536,7 @@ class Message(object):
             "media.stop": "停止播放",
             "PlaybackStart": "开始播放",
             "PlaybackStop": "停止播放",
-            "item.rate": "标记了",
-            "media.del": "Emby同步删除"
+            "item.rate": "标记了"
         }
         _webhook_images = {
             "Emby": "https://emby.media/notificationicon.png",
@@ -553,6 +552,8 @@ class Message(object):
             message_title = f"{_webhook_actions.get(event_info.get('event'))}剧集 {event_info.get('item_name')}"
         elif event_info.get('item_type') == "MOV":
             message_title = f"{_webhook_actions.get(event_info.get('event'))}电影 {event_info.get('item_name')}"
+        elif event_info.get('item_type') == "AUD":
+            message_title = f"{_webhook_actions.get(event_info.get('event'))}有声书 {event_info.get('item_name')}"
         else:
             message_title = f"{_webhook_actions.get(event_info.get('event'))}"
 
