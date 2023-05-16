@@ -171,7 +171,7 @@ export class NormalCard extends observeState(CustomElement) {
 
   _loveClick(e) {
     e.stopPropagation();
-    Golbal.lit_love_click(this.title, this.year, this.media_type, this.tmdb_id, this.fav,
+    Golbal.lit_love_click(this.title, this.year, this.res_type, this.tmdb_id, this.fav,
       () => {
         this.fav = "0";
         this._fav_change();

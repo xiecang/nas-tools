@@ -358,7 +358,7 @@ class DoubanSync(_IPluginModule):
             print(str(e))
 
     @EventHandler.register(EventType.DoubanSync)
-    def sync(self, event=None):
+    def sync(self):
         """
         同步豆瓣数据
         """
@@ -368,7 +368,8 @@ class DoubanSync(_IPluginModule):
         with lock:
             self.info("开始同步豆瓣数据...")
             # 拉取豆瓣数据
-            medias = self.__get_all_douban_movies()
+            douban_ids = self.__get_all_douban_movies()
+            medias = self.__get_douban_info(douban_ids)
             # 开始检索
             for media in medias:
                 if not media or not media.get_name():
@@ -376,6 +377,7 @@ class DoubanSync(_IPluginModule):
                 try:
                     # 查询数据库状态，已经加入RSS的不处理
                     search_state = self.dbhelper.get_douban_search_state(media.get_name(), media.year)
+                    mark_date = douban_ids[media.douban_id].get("mark_date")
                     if not search_state or search_state[0] == "NEW":
                         if self._auto_search:
                             # 需要检索
@@ -391,7 +393,7 @@ class DoubanSync(_IPluginModule):
                                 self.warn("%s 未查询到媒体信息" % media.get_name())
                                 continue
                             # 检查是否存在，电视剧返回不存在的集清单
-                            exist_flag, no_exists, _ = self.downloader.check_exists_medias(meta_info=media_info)
+                            exist_flag, need_tvs, _ = self.downloader.check_exists_medias(meta_info=media_info)
                             # 已经存在
                             if exist_flag:
                                 # 更新为已下载状态
@@ -402,14 +404,26 @@ class DoubanSync(_IPluginModule):
                                 # 合并季
                                 media_info.begin_season = media.begin_season
                                 # 开始检索
-                                search_result, no_exists, search_count, download_count = self.searcher.search_one_media(
+                                search_result = self.searcher.search_one_media(
                                     media_info=media_info,
                                     in_from=SearchType.DB,
-                                    no_exists=no_exists,
                                     user_name=media_info.user_name)
+
+                                if need_tvs:
+                                    need_tvs = need_tvs[0]
+                                    need_tvs['episode_filter_orders'].update({e: 0 for e in need_tvs['episodes']})
+                                    need_tvs['episode_filter_orders'].update({e: 1 for e, o in need_tvs['episode_filter_orders'].items() if o == 0 and e not in need_tvs['episodes']})
                                 if search_result:
-                                    # 下载全了更新为已下载，没下载全的下次同步再次搜索
-                                    self.dbhelper.insert_douban_media_state(media, "DOWNLOADED")
+                                    _, no_exists = self.downloader.batch_download(
+                                        media_info.type,
+                                        in_from=SearchType.DB,
+                                        media_list=search_result,
+                                        tmdb_id=media_info.tmdb_id,
+                                        need_tvs=need_tvs,
+                                        user_name=media_info.user_name)
+                                    if not no_exists.get(media_info.tmdb_id):
+                                        # 下载全了更新为已下载，没下载全的下次同步再次搜索
+                                        self.dbhelper.insert_douban_media_state(media, mark_date, "DOWNLOADED")
                             else:
                                 # 需要加订阅，则由订阅去检索
                                 self.info(
@@ -425,10 +439,10 @@ class DoubanSync(_IPluginModule):
                                     self.error("%s 添加订阅失败：%s" % (media.get_name(), msg))
                                     # 订阅已存在
                                     if code == 9:
-                                        self.dbhelper.insert_douban_media_state(media, "RSS")
+                                        self.dbhelper.insert_douban_media_state(media, mark_date, "RSS")
                                 else:
                                     # 插入为已RSS状态
-                                    self.dbhelper.insert_douban_media_state(media, "RSS")
+                                    self.dbhelper.insert_douban_media_state(media, mark_date, "RSS")
                         else:
                             # 不需要检索
                             if self._auto_rss:
@@ -447,14 +461,14 @@ class DoubanSync(_IPluginModule):
                                     self.error("%s 添加订阅失败：%s" % (media.get_name(), msg))
                                     # 订阅已存在
                                     if code == 9:
-                                        self.dbhelper.insert_douban_media_state(media, "RSS")
+                                        self.dbhelper.insert_douban_media_state(media, mark_date, "RSS")
                                 else:
                                     # 插入为已RSS状态
-                                    self.dbhelper.insert_douban_media_state(media, "RSS")
+                                    self.dbhelper.insert_douban_media_state(media, mark_date, "RSS")
                             elif not search_state:
                                 self.info("%s %s 更新到%s列表中..." % (
                                     media.get_name(), media.year, media.type.value))
-                                self.dbhelper.insert_douban_media_state(media, "NEW")
+                                self.dbhelper.insert_douban_media_state(media, mark_date, "NEW")
 
                     else:
                         self.info("%s %s 已处理过" % (media.get_name(), media.year))
@@ -462,6 +476,37 @@ class DoubanSync(_IPluginModule):
                     self.error("%s %s 处理失败：%s" % (media.get_name(), media.year, str(err)))
                     continue
             self.info("豆瓣数据同步完成")
+
+    def __get_douban_info(self, douban_ids):
+        media_list = []
+        # 查询豆瓣详情
+        for doubanid, info in douban_ids.items():
+            douban_info = self.douban.get_douban_detail(doubanid=doubanid, wait=True)
+            # 组装媒体信息
+            if not douban_info:
+                self.warn("【Douban】%s 未正确获取豆瓣详细信息，尝试使用网页获取" % doubanid)
+                douban_info = self.douban.get_media_detail_from_web(doubanid)
+                if not douban_info:
+                    self.warn("【Douban】%s 无权限访问，需要配置豆瓣Cookie" % doubanid)
+                    # 随机休眠
+                    sleep(round(random.uniform(1, 5), 1))
+                    continue
+            media_type = MediaType.TV if douban_info.get("episodes_count") else MediaType.MOVIE
+            self.info("【Douban】%s：%s %s".strip() % (media_type.value, douban_info.get("title"), douban_info.get("year")))
+            meta_info = MetaInfo(title="%s %s" % (douban_info.get("title"), douban_info.get("year") or ""))
+            meta_info.douban_id = doubanid
+            meta_info.type = media_type
+            meta_info.overview = douban_info.get("intro")
+            meta_info.poster_path = douban_info.get("cover_url")
+            rating = douban_info.get("rating", {}) or {}
+            meta_info.vote_average = rating.get("value") or ""
+            meta_info.imdb_id = douban_info.get("imdbid")
+            meta_info.user_name = info.get("user_name")
+            if meta_info not in media_list:
+                media_list.append(meta_info)
+            # 随机休眠
+            sleep(round(random.uniform(1, 5), 1))
+        return media_list
 
     def __get_all_douban_movies(self):
         """
@@ -529,7 +574,8 @@ class DoubanSync(_IPluginModule):
                                 self.info("解析到媒体：%s" % doubanid)
                                 if doubanid not in douban_ids:
                                     douban_ids[doubanid] = {
-                                        "user_name": user_name
+                                        "user_name": user_name,
+                                        "mark_date": mark_date,
                                     }
                                 sucess_urlnum += 1
                                 user_type_succnum += 1
@@ -549,31 +595,4 @@ class DoubanSync(_IPluginModule):
                 self.debug(f"用户 {user_name or user} 的 {mtype} 解析完成，共获取到 {user_type_succnum} 个媒体")
             self.info(f"用户 {user_name or user} 解析完成，共获取到 {user_succnum} 个媒体")
         self.info(f"所有用户解析完成，共获取到 {len(douban_ids)} 个媒体")
-        # 查询豆瓣详情
-        for doubanid, info in douban_ids.items():
-            douban_info = self.douban.get_douban_detail(doubanid=doubanid, wait=True)
-            # 组装媒体信息
-            if not douban_info:
-                self.warn("%s 未正确获取豆瓣详细信息，尝试使用网页获取" % doubanid)
-                douban_info = self.douban.get_media_detail_from_web(doubanid)
-                if not douban_info:
-                    self.warn("%s 无权限访问，需要配置豆瓣Cookie" % doubanid)
-                    # 随机休眠
-                    sleep(round(random.uniform(1, 5), 1))
-                    continue
-            media_type = MediaType.TV if douban_info.get("episodes_count") else MediaType.MOVIE
-            self.info("%s：%s %s".strip() % (media_type.value, douban_info.get("title"), douban_info.get("year")))
-            meta_info = MetaInfo(title="%s %s" % (douban_info.get("title"), douban_info.get("year") or ""))
-            meta_info.douban_id = doubanid
-            meta_info.type = media_type
-            meta_info.overview = douban_info.get("intro")
-            meta_info.poster_path = douban_info.get("cover_url")
-            rating = douban_info.get("rating", {}) or {}
-            meta_info.vote_average = rating.get("value") or ""
-            meta_info.imdb_id = douban_info.get("imdbid")
-            meta_info.user_name = info.get("user_name")
-            if meta_info not in media_list:
-                media_list.append(meta_info)
-            # 随机休眠
-            sleep(round(random.uniform(1, 5), 1))
-        return media_list
+        return douban_ids

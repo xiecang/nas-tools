@@ -541,6 +541,7 @@ def downloading():
     DispTorrents = WebAction().get_torrents(type='downloading').get("result")
     return render_template("download/downloading.html",
                            DownloadCount=len(DispTorrents),
+                           Page="Downloading",
                            Torrents=DispTorrents)
 
 

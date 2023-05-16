@@ -795,11 +795,11 @@ function add_rss_manual(flag) {
       if (CURRENT_PAGE_URI.startsWith("tv_rss") || CURRENT_PAGE_URI.startsWith("movie_rss")) {
         window_history_refresh();
       } else {
-        show_rss_success_modal(ret.rssid, type, name + " 添加订阅成功！");
+        show_rss_success_modal(ret.rssid, mtype, name + " 添加订阅成功！");
       }
       if (flag) {
         show_add_rss_media_modal(mtype);
-      }
+      } 
     } else {
       if (CURRENT_PAGE_URI.startsWith("tv_rss") || CURRENT_PAGE_URI.startsWith("movie_rss")) {
         show_fail_modal(`${ret.name} 订阅失败：${ret.msg}！`, function () {
@@ -845,7 +845,7 @@ function remove_rss_manual(type, name, year, rssid) {
 }
 
 // 新增订阅
-function show_add_rss_media_modal(mtype) {
+function show_add_rss_media_modal(mtype, title=null, year=null, tmdb_id=null, add_func=null) {
   // 刷新下拉框
   refresh_rss_download_setting_dirs();
   // 界面初始化
@@ -861,14 +861,20 @@ function show_add_rss_media_modal(mtype) {
   $("#rss_total_ep").val("");
   $("#rss_current_ep").val("");
   let rss_setting;
-  if (mtype === "TV") {
+  if (mtype === "TV" || mtype == "电视剧") {
     $("#rss_type").val("TV");
     $("#rss_tv_season_div").show();
     rss_setting = localStorage.getItem("RssSettingTV");
-  } else if (mtype === "MOV") {
+  } else if (mtype === "MOV" || mtype == "电影") {
     $("#rss_type").val("MOV");
     $("#rss_tv_season_div").hide();
     rss_setting = localStorage.getItem("RssSettingMOV");
+  }
+  if (title) {
+    $("#rss_name").val(title)
+  }
+  if (year) {
+    $("#rss_year").val(year)
   }
   if (rss_setting) {
     rss_setting = JSON.parse(rss_setting);
