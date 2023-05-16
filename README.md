@@ -25,15 +25,6 @@ Docker：[链接](https://hub.docker.com/r/n120318/nas-tools)
 4. 会有 bug，但是你如果有办法提出，我会尝试修复。
 5. 后续可能会精简一些功能。
 
-## 分支与构建说明
-
-1. `master` 分支会尽可能地从原项目合并 Release tag，会构建 latest 和 tag 镜像，其中 tag 会和原项目版本号保持一致
-2. `dev` 分支是我个人的开发分支，其中会存在当前满足我个人使用，但尚未开发完成的功能，会构建 beta 镜像
-
-## 附：和主项目的分支细节
-
-![image](https://user-images.githubusercontent.com/20685540/219598179-238ce668-991b-457f-9f88-152d12590521.png)
-
 ## 写在最后
 
 nas-tool 是一个非常实用的项目，对于国内用户，它能解决非常多的问题，使用没有历史包袱的 nas-tool， 你可能不再需要 Sonarr, Radarr, Ombi 等工具。
