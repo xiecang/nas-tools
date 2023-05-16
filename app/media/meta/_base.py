@@ -1,7 +1,7 @@
 import re
 import cn2an
 from app.media.fanart import Fanart
-from config import ANIME_GENREIDS, DEFAULT_TMDB_IMAGE, TMDB_IMAGE_W500_URL
+from config import ANIME_GENREIDS, DEFAULT_TMDB_IMAGE, Config
 from app.media.category import Category
 from app.utils import StringUtils, ExceptionUtils
 from app.utils.types import MediaType
@@ -52,7 +52,7 @@ class MetaBase(object):
     # 音频编码
     audio_encode = None
     # 二级分类
-    category = None
+    category = ""
     # TMDB ID
     tmdb_id = 0
     # IMDB ID
@@ -124,6 +124,8 @@ class MetaBase(object):
     download_volume_factor = None
     # HR
     hit_and_run = None
+    # 种子标签
+    labels = None
     # 订阅ID
     rssid = None
     # 保存目录
@@ -261,6 +263,36 @@ class MetaBase(object):
             return [season for season in range(self.begin_season, self.end_season + 1)]
         else:
             return [self.begin_season]
+
+    # 更新季
+    def set_season(self, sea):
+        if not sea:
+            return
+        if isinstance(sea, list):
+            if len(sea) == 1 and str(sea[0]).isdigit():
+                self.begin_season = int(sea[0])
+                self.end_season = None
+            elif len(sea) > 1 and str(sea[0]).isdigit() and str(sea[-1]).isdigit():
+                self.begin_season = int(sea[0])
+                self.end_season = int(sea[-1])
+        elif str(sea).isdigit():
+            self.begin_season = int(sea)
+            self.end_season = None
+
+    # 更新集
+    def set_episode(self, ep):
+        if not ep:
+            return
+        if isinstance(ep, list):
+            if len(ep) == 1 and str(ep[0]).isdigit():
+                self.begin_episode = int(ep[0])
+                self.end_episode = None
+            elif len(ep) > 1 and str(ep[0]).isdigit() and str(ep[-1]).isdigit():
+                self.begin_episode = int(ep[0])
+                self.end_episode = int(ep[-1])
+        elif str(ep).isdigit():
+            self.begin_episode = int(ep)
+            self.end_episode = None
 
     # 返回集字符串
     def get_episode_string(self):
@@ -518,10 +550,10 @@ class MetaBase(object):
                 self.category = self.category_handler.get_tv_category(info)
             else:
                 self.category = self.category_handler.get_anime_category(info)
-        self.poster_path = TMDB_IMAGE_W500_URL % info.get('poster_path') if info.get(
-            'poster_path') else ""
-        self.backdrop_path = TMDB_IMAGE_W500_URL % info.get('backdrop_path') if info.get(
-            'backdrop_path') else ""
+        self.poster_path = Config().get_tmdbimage_url(info.get('poster_path')) \
+            if info.get('poster_path') else ""
+        self.backdrop_path = Config().get_tmdbimage_url(info.get('backdrop_path')) \
+            if info.get('backdrop_path') else ""
 
     # 整合种了信息
     def set_torrent_info(self,
@@ -540,7 +572,8 @@ class MetaBase(object):
                          rssid=None,
                          hit_and_run=None,
                          imdbid=None,
-                         over_edition=None):
+                         over_edition=None,
+                         labels=None):
         if site:
             self.site = site
         if site_order:
@@ -573,6 +606,8 @@ class MetaBase(object):
             self.imdb_id = imdbid
         if over_edition is not None:
             self.over_edition = over_edition
+        if labels is not None:
+            self.labels = labels
 
     # 整合下载参数
     def set_download_info(self, download_setting=None, save_path=None):

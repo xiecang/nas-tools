@@ -4,14 +4,12 @@ from time import sleep
 
 import zhconv
 
-from app.utils.commons import singleton
-from app.utils import ExceptionUtils, StringUtils
-
 import log
-from config import Config
 from app.media.doubanapi import DoubanApi, DoubanWeb
 from app.media.meta import MetaInfo
+from app.utils import ExceptionUtils, StringUtils
 from app.utils import RequestUtils
+from app.utils.commons import singleton
 from app.utils.types import MediaType
 
 lock = Lock()
@@ -32,18 +30,13 @@ class DouBan:
     def init_config(self):
         self.doubanapi = DoubanApi()
         self.doubanweb = DoubanWeb()
-        douban = Config().get_config('douban')
-        if douban:
-            # Cookie
-            self.cookie = douban.get('cookie')
-            if not self.cookie:
-                try:
-                    res = RequestUtils(timeout=5).get_res("https://www.douban.com/")
-                    if res:
-                        self.cookie = StringUtils.str_from_cookiejar(res.cookies)
-                except Exception as err:
-                    ExceptionUtils.exception_traceback(err)
-                    log.warn(f"【Douban】获取cookie失败：{format(err)}")
+        try:
+            res = RequestUtils(timeout=5).get_res("https://www.douban.com/")
+            if res:
+                self.cookie = StringUtils.str_from_cookiejar(res.cookies)
+        except Exception as err:
+            ExceptionUtils.exception_traceback(err)
+            log.warn(f"【Douban】获取cookie失败：{format(err)}")
 
     def get_douban_detail(self, doubanid, mtype=None, wait=False):
         """
@@ -76,7 +69,10 @@ class DouBan:
         log.info("【Douban】查询到数据：%s" % douban_info.get("title"))
         return douban_info
 
-    def __search_douban_id(self, metainfo):
+    def search_douban(self, metainfo):
+        return self.__search_douban(metainfo)
+
+    def __search_douban(self, metainfo):
         """
         给定名称和年份，查询一条豆瓣信息返回对应ID
         :param metainfo: 已进行识别过的媒体信息
@@ -88,14 +84,14 @@ class DouBan:
         if metainfo.type == MediaType.MOVIE:
             search_res = self.doubanapi.movie_search(metainfo.title).get("items") or []
             if not search_res:
-                return None
+                return None, None
             for res in search_res:
                 douban_meta = MetaInfo(title=res.get("target", {}).get("title"))
                 if metainfo.title == douban_meta.get_name() \
                         and (int(res.get("target", {}).get("year")) in year_range or not year_range):
-                    return res.get("target_id")
+                    return res.get("target_id"), res.get("target", {})
             return None
-        elif metainfo.type == MediaType.TV:
+        elif metainfo.type == MediaType.TV or metainfo.type == MediaType.ANIME:
             search_res = self.doubanapi.tv_search(metainfo.title).get("items") or []
             if not search_res:
                 return None
@@ -103,18 +99,18 @@ class DouBan:
                 douban_meta = MetaInfo(title=res.get("target", {}).get("title"))
                 if metainfo.title == douban_meta.get_name() \
                         and (str(res.get("target", {}).get("year")) == str(metainfo.year) or not metainfo.year):
-                    return res.get("target_id")
+                    return res.get("target_id"), res.get("targe", {})
                 if metainfo.title == douban_meta.get_name() \
                         and metainfo.get_season_string() == douban_meta.get_season_string():
-                    return res.get("target_id")
-            return search_res[0].get("target_id")
+                    return res.get("target_id"), res.get("target", {})
+            return search_res[0].get("target_id"), search_res[0].get("target", {})
 
     def get_douban_info(self, metainfo):
         """
         查询附带演职人员的豆瓣信息
         :param metainfo: 已进行识别过的媒体信息
         """
-        doubanid = self.__search_douban_id(metainfo)
+        doubanid, _ = self.__search_douban(metainfo)
         if not doubanid:
             return None
         if metainfo.type == MediaType.MOVIE:

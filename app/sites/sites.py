@@ -1,8 +1,10 @@
 import json
 from datetime import datetime
 
+import log
 from app.helper import ChromeHelper, SiteHelper, DbHelper
 from app.message import Message
+from app.sites.site_limiter import SiteRateLimiter
 from app.utils import RequestUtils, StringUtils
 from app.utils.commons import singleton
 from config import Config
@@ -21,6 +23,7 @@ class Sites:
     _brush_sites = []
     _statistic_sites = []
     _signin_sites = []
+    _limiters = {}
 
     _MAX_CONCURRENCY = 10
 
@@ -44,6 +47,8 @@ class Sites:
         self._statistic_sites = []
         # 开启签到功能站点：
         self._signin_sites = []
+        # 站点限速器
+        self._limiters = {}
         # 站点图标
         self.init_favicons()
         # 站点数据
@@ -91,6 +96,9 @@ class Sites:
                 "chrome": True if site_note.get("chrome") == "Y" else False,
                 "proxy": True if site_note.get("proxy") == "Y" else False,
                 "subtitle": True if site_note.get("subtitle") == "Y" else False,
+                "limit_interval": site_note.get("limit_interval"),
+                "limit_count": site_note.get("limit_count"),
+                "limit_seconds": site_note.get("limit_seconds"),
                 "strict_url": StringUtils.get_base_url(site_signurl or site_rssurl)
             }
             # 以ID存储
@@ -99,6 +107,19 @@ class Sites:
             site_strict_url = StringUtils.get_url_domain(site.SIGNURL or site.RSSURL)
             if site_strict_url:
                 self._siteByUrls[site_strict_url] = site_info
+            # 初始化站点限速器
+            if (site_note.get("limit_interval")
+                and str(site_note.get("limit_interval")).isdigit()
+                and site_note.get("limit_count")
+                and str(site_note.get("limit_count")).isdigit()) \
+                    or (site_note.get("limit_seconds")
+                        and str(site_note.get("limit_seconds")).isdigit()):
+                self._limiters[site.ID] = SiteRateLimiter(
+                    limit_interval=int(site_note.get("limit_interval")) * 60,
+                    limit_count=int(site_note.get("limit_count")),
+                    limit_seconds=int(site_note.get("limit_seconds")) if site_note.get("limit_seconds") and str(
+                        site_note.get("limit_seconds")).isdigit() else None
+                )
 
     def init_favicons(self):
         """
@@ -135,6 +156,36 @@ class Sites:
         if siteid or siteurl:
             return {}
         return ret_sites
+
+    def check_ratelimit(self, site_id):
+        """
+        检查站点是否触发流控
+        :param site_id: 站点ID
+        :return: True为触发了流控，False为未触发
+        """
+        if not self._limiters.get(site_id):
+            return False
+        state, msg = self._limiters[site_id].check_rate_limit()
+        if msg:
+            log.warn(f"【Sites】站点 {self._siteByIds[site_id].get('name')} {msg}")
+        return state
+
+    def get_sites_by_suffix(self, suffix):
+        """
+        根据url的后缀获取站点配置
+        """
+        for key in self._siteByUrls:
+            if key.endswith(suffix):
+                return self._siteByUrls[key]
+        return {}
+
+    def get_max_site_pri(self):
+        """
+        获取最大站点优先级
+        """
+        if not self._siteByIds:
+            return 0
+        return max([int(site.get("pri")) for site in self._siteByIds.values()])
 
     def get_site_dict(self,
                       rss=False,
@@ -212,7 +263,7 @@ class Sites:
         if site_info.get("chrome") and chrome.get_status():
             # 计时
             start_time = datetime.now()
-            if not chrome.visit(url=site_url, ua=ua, cookie=site_cookie):
+            if not chrome.visit(url=site_url, ua=ua, cookie=site_cookie, proxy=site_info.get("proxy")):
                 return False, "Chrome模拟访问失败", 0
             # 循环检测是否过cf
             cloudflare = chrome.pass_cloudflare()

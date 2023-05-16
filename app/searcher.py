@@ -7,7 +7,8 @@ from app.message import Message
 from app.downloader import Downloader
 from app.media import Media
 from app.helper import ProgressHelper
-from app.utils.types import SearchType, EventType
+from app.utils.types import SearchType, EventType, ProgressKey
+from app.media.meta import MetaVideo
 
 
 class Searcher:
@@ -18,8 +19,6 @@ class Searcher:
     progress = None
     dbhelper = None
     eventmanager = None
-
-    _search_auto = True
 
     def __init__(self):
         self.init_config()
@@ -32,7 +31,6 @@ class Searcher:
         self.dbhelper = DbHelper()
         self.indexer = Indexer()
         self.eventmanager = EventManager()
-        self._search_auto = Config().get_config("pt").get('search_auto', True)
 
     def search_medias(self,
                       key_word: [str, list],
@@ -63,29 +61,25 @@ class Searcher:
                                               match_media=match_media,
                                               in_from=in_from)
 
-    def search_one_media(self, media_info,
+    def search_one_media(self, media_info: MetaVideo,
                          in_from: SearchType,
-                         no_exists: dict,
                          sites: list = None,
-                         filters: dict = None,
-                         user_name=None):
+                         filters: dict = None):
         """
-        只检索和下载一个资源，用于精确检索下载，由微信、Telegram或豆瓣调用
+        只检索一个资源，用于精确检索，由RSS、微信、Telegram或豆瓣调用
         :param media_info: 已识别的媒体信息
         :param in_from: 搜索渠道
-        :param no_exists: 缺失的剧集清单
         :param sites: 检索哪些站点
         :param filters: 过滤条件，为空则不过滤
-        :param user_name: 用户名
-        :return: 请求的资源是否全部下载完整，如完整则返回媒体信息
-                 请求的资源如果是剧集则返回下载后仍然缺失的季集信息
-                 搜索到的结果数量
-                 下载到的结果数量，如为None则表示未开启自动下载
+        :return: 搜索到的结果
         """
-        if not media_info:
-            return None, {}, 0, 0
+        if not media_info or sites == []:
+            return None
+        if sites == []:
+            log.warn("【Searcher】没有设置用于订阅搜索的站点。")
+            return None
         # 进度计数重置
-        self.progress.start('search')
+        self.progress.start(ProgressKey.Search)
         # 查找的季
         if media_info.begin_season is None:
             search_season = None
@@ -122,8 +116,8 @@ class Searcher:
                 if media_info.original_language == "en":
                     search_en_name = media_info.original_title
                 else:
-                    # 此处使用独立对象，避免影响TMDB语言
-                    en_title = Media().get_tmdb_en_title(media_info)
+                    # 获取英文标题
+                    en_title = self.media.get_tmdb_en_title(media_info)
                     if en_title:
                         search_en_name = en_title
             # 两次搜索名称
@@ -153,39 +147,18 @@ class Searcher:
                                             filter_args=filter_args,
                                             match_media=media_info,
                                             in_from=in_from)
-
         if len(media_list) == 0:
             log.info("【Searcher】%s 未搜索到任何资源" % second_search_name)
-            return None, no_exists, 0, 0
-        else:
-            if in_from in self.message.get_search_types():
-                # 保存搜索记录
-                self.dbhelper.delete_all_search_torrents()
-                # 搜索结果排序
-                media_list = sorted(media_list, key=lambda x: "%s%s%s%s" % (str(x.title).ljust(100, ' '),
-                                                                            str(x.res_order).rjust(3, '0'),
-                                                                            str(x.site_order).rjust(3, '0'),
-                                                                            str(x.seeders).rjust(10, '0')),
-                                    reverse=True)
-                # 插入数据库
-                self.dbhelper.insert_search_results(media_list)
-                # 微信未开自动下载时返回
-                if not self._search_auto:
-                    return None, no_exists, len(media_list), None
-            # 择优下载
-            download_items, left_medias = self.downloader.batch_download(in_from=in_from,
-                                                                         media_list=media_list,
-                                                                         need_tvs=no_exists,
-                                                                         user_name=user_name)
-            # 统计下载情况，下全了返回True，没下全返回False
-            if not download_items:
-                log.info("【Searcher】%s 未下载到资源" % media_info.title)
-                return None, left_medias, len(media_list), 0
-            else:
-                log.info("【Searcher】实际下载了 %s 个资源" % len(download_items))
-                # 还有剩下的缺失，说明没下完，返回False
-                if left_medias:
-                    return None, left_medias, len(media_list), len(download_items)
-                # 全部下完了
-                else:
-                    return download_items[0], no_exists, len(media_list), len(download_items)
+            return None
+        if in_from in self.message.get_search_types():
+            # 保存搜索记录
+            self.dbhelper.delete_all_search_torrents()
+            # 搜索结果排序
+            media_list = sorted(media_list, key=lambda x: "%s%s%s%s" % (str(x.title).ljust(100, ' '),
+                                                                        str(x.res_order).rjust(3, '0'),
+                                                                        str(x.site_order).rjust(3, '0'),
+                                                                        str(x.seeders).rjust(10, '0')),
+                                reverse=True)
+            # 插入数据库
+            self.dbhelper.insert_search_results(media_list)
+        return media_list

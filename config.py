@@ -14,7 +14,8 @@ RMT_FAVTYPE = '精选'
 RMT_MEDIAEXT = ['.mp4', '.mkv', '.ts', '.iso',
                 '.rmvb', '.avi', '.mov', '.mpeg',
                 '.mpg', '.wmv', '.3gp', '.asf',
-                '.m4v', '.flv', '.m2ts', '.strm']
+                '.m4v', '.flv', '.m2ts', '.strm',
+                '.tp']
 # 支持的字幕文件后缀格式
 RMT_SUBEXT = ['.srt', '.ass', '.ssa']
 # 电视剧动漫的分类genre_ids
@@ -31,8 +32,6 @@ METAINFO_SAVE_INTERVAL = 600
 SYNC_TRANSFER_INTERVAL = 60
 # RSS队列中处理时间间隔
 RSS_CHECK_INTERVAL = 300
-# 站点流量数据刷新时间间隔（小时）
-REFRESH_PT_DATA_INTERVAL = 6
 # 刷新订阅TMDB数据的时间间隔（小时）
 RSS_REFRESH_TMDB_INTERVAL = 6
 # 刷流删除的检查时间间隔
@@ -51,15 +50,15 @@ DEFAULT_WECHAT_PROXY = 'https://wechat.nastool.cn'
 # 默认OCR识别服务地址
 DEFAULT_OCR_SERVER = 'https://nastool.cn'
 # 默认TMDB代理服务地址
-DEFAULT_TMDB_PROXY = 'https://tmdb.nastool.cn'
+DEFAULT_TMDB_PROXY = 'https://tmdb.nastool.cn/3'
 # 默认CookieCloud服务地址
 DEFAULT_COOKIECLOUD_SERVER = 'http://nastool.cn:8088'
+# TMDB API地址
+TMDB_API_DOMAIN = 'api.themoviedb.org'
 # TMDB图片地址
-TMDB_IMAGE_W500_URL = 'https://image.tmdb.org/t/p/w500%s'
-TMDB_IMAGE_ORIGINAL_URL = 'https://image.tmdb.org/t/p/original%s'
-TMDB_IMAGE_FACE_URL = 'https://image.tmdb.org/t/p/h632%s'
+TMDB_IMAGE_DOMAIN = 'image.tmdb.org'
 TMDB_PEOPLE_PROFILE_URL = 'https://www.themoviedb.org/person/%s'
-# 添加下载时增加的标签，开始只监控NASTool添加的下载时有效
+# 添加下载时增加的标签，开始只监控NAStool添加的下载时有效
 PT_TAG = "NASTOOL"
 # 电影默认命名格式
 DEFAULT_MOVIE_FORMAT = '{title} ({year})/{title} ({year})-{part} - {videoFormat}'
@@ -123,6 +122,7 @@ class Config(object):
                 print("【Config】NASTOOL_CONFIG 环境变量未设置，程序无法工作，正在退出...")
                 quit()
             if not os.path.exists(self._config_path):
+                os.makedirs(os.path.dirname(self._config_path), exist_ok=True)
                 cfg_tp_path = os.path.join(self.get_inner_config_path(), "config.yaml")
                 cfg_tp_path = cfg_tp_path.replace("\\", "/")
                 shutil.copy(cfg_tp_path, self._config_path)
@@ -180,10 +180,10 @@ class Config(object):
         return os.path.join(self.get_root_path(), "config")
 
     def get_script_path(self):
-        return os.path.join(self.get_inner_config_path(), "scripts")
+        return os.path.join(self.get_root_path(), "scripts", "sqls")
 
-    def get_plugin_path(self):
-        return os.path.join(self.get_config_path(), "plugin")
+    def get_user_plugin_path(self):
+        return os.path.join(self.get_config_path(), "plugins")
 
     def get_domain(self):
         domain = (self.get_config('app') or {}).get('domain')
@@ -200,3 +200,23 @@ class Config(object):
         global RMT_FAVTYPE
         if favtype:
             RMT_FAVTYPE = favtype
+
+    def get_tmdbapi_url(self):
+        if self.get_config('laboratory').get("tmdb_proxy"):
+            return DEFAULT_TMDB_PROXY
+        return f"https://{self.get_config('app').get('tmdb_domain') or TMDB_API_DOMAIN}/3"
+
+    def get_tmdbimage_url(self, path, prefix="w500"):
+        if not path:
+            return ""
+        tmdb_image_url = self.get_config("app").get("tmdb_image_url")
+        if tmdb_image_url:
+            return tmdb_image_url + f"/t/p/{prefix}{path}"
+        return f"https://{TMDB_IMAGE_DOMAIN}/t/p/{prefix}{path}"
+
+    @property
+    def category_path(self):
+        category = self.get_config('media').get("category")
+        if category:
+            return os.path.join(Config().get_config_path(), f"{category}.yaml")
+        return None

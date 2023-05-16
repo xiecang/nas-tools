@@ -4,7 +4,7 @@ import re
 import log
 from config import Config
 from app.mediaserver.client._base import _IMediaClient
-from app.utils import RequestUtils, SystemUtils, ExceptionUtils
+from app.utils import RequestUtils, SystemUtils, ExceptionUtils, IpUtils
 from app.utils.types import MediaType, MediaServerType
 
 
@@ -19,8 +19,10 @@ class Emby(_IMediaClient):
 
     # 私有属性
     _client_config = {}
+    _serverid = None
     _apikey = None
     _host = None
+    _play_host = None
     _user = None
     _libraries = []
 
@@ -39,10 +41,19 @@ class Emby(_IMediaClient):
                     self._host = "http://" + self._host
                 if not self._host.endswith('/'):
                     self._host = self._host + "/"
+            self._play_host = self._client_config.get('play_host')
+            if not self._play_host:
+                self._play_host = self._host
+            else:
+                if not self._play_host.startswith('http'):
+                    self._play_host = "http://" + self._play_host
+                if not self._play_host.endswith('/'):
+                    self._play_host = self._play_host + "/"
             self._apikey = self._client_config.get('api_key')
             if self._host and self._apikey:
                 self._libraries = self.__get_emby_librarys()
                 self._user = self.get_admin_user()
+                self._serverid = self.get_server_id()
 
     @classmethod
     def match(cls, ctype):
@@ -95,6 +106,24 @@ class Emby(_IMediaClient):
         except Exception as e:
             ExceptionUtils.exception_traceback(e)
             log.error(f"【{self.client_name}】连接Users出错：" + str(e))
+        return None
+
+    def get_server_id(self):
+        """
+        获得服务器信息
+        """
+        if not self._host or not self._apikey:
+            return None
+        req_url = "%sSystem/Info?api_key=%s" % (self._host, self._apikey)
+        try:
+            res = RequestUtils().get_res(req_url)
+            if res:
+                return res.json().get("Id")
+            else:
+                log.error(f"【{self.client_name}】System/Info 未获取到返回数据")
+        except Exception as e:
+            ExceptionUtils.exception_traceback(e)
+            log.error(f"【{self.client_name}】连接System/Info出错：" + str(e))
         return None
 
     def get_user_count(self):
@@ -300,7 +329,40 @@ class Emby(_IMediaClient):
         total_episodes = [episode for episode in range(1, total_num + 1)]
         return list(set(total_episodes).difference(set(exists_episodes)))
 
-    def get_image_by_id(self, item_id, image_type):
+    def get_episode_image_by_id(self, item_id, season_id, episode_id):
+        """
+        根据itemid、season_id、episode_id从Emby查询图片地址
+        :param item_id: 在Emby中的ID
+        :param season_id: 季
+        :param episode_id: 集
+        :return: 图片对应在TMDB中的URL
+        """
+        if not self._host or not self._apikey:
+            return None
+        # 查询所有剧集
+        req_url = "%semby/Shows/%s/Episodes?Season=%s&IsMissing=false&api_key=%s" % (
+            self._host, item_id, season_id, self._apikey)
+        try:
+            res_json = RequestUtils().get_res(req_url)
+            if res_json:
+                res_items = res_json.json().get("Items")
+                for res_item in res_items:
+                    # 查询当前剧集的itemid
+                    if res_item.get("IndexNumber") == episode_id:
+                        # 查询当前剧集的图片
+                        img_url = self.get_remote_image_by_id(res_item.get("Id"), "Primary")
+                        # 没查到tmdb图片则判断播放地址是不是外网，使用emby刮削的图片（直接挂载网盘场景）
+                        if not img_url and not IpUtils.is_internal(self._play_host) \
+                                and res_item.get('ImageTags', {}).get('Primary'):
+                            return "%semby/Items/%s/Images/Primary?maxHeight=225&maxWidth=400&tag=%s&quality=90" % (
+                                self._play_host, res_item.get("Id"), res_item.get('ImageTags', {}).get('Primary'))
+                        return img_url
+        except Exception as e:
+            ExceptionUtils.exception_traceback(e)
+            log.error(f"【{self.client_name}】连接Shows/Id/Episodes出错：" + str(e))
+            return None
+
+    def get_remote_image_by_id(self, item_id, image_type):
         """
         根据ItemId从Emby查询图片地址
         :param item_id: 在Emby中的ID
@@ -324,6 +386,18 @@ class Emby(_IMediaClient):
             ExceptionUtils.exception_traceback(e)
             log.error(f"【{self.client_name}】连接Items/Id/RemoteImages出错：" + str(e))
             return None
+        return None
+
+    def get_local_image_by_id(self, item_id):
+        """
+        根据ItemId从媒体服务器查询本地图片地址
+        :param item_id: 在Emby中的ID
+        """
+        if not self._host or not self._apikey:
+            return None
+        if self._play_host and not IpUtils.is_internal(self._play_host):
+            return "%sItems/%s/Images/Primary?maxHeight=225&maxWidth=400&quality=90" % (
+                self._play_host, item_id)
         return None
 
     def __refresh_emby_library_by_id(self, item_id):
@@ -422,7 +496,7 @@ class Emby(_IMediaClient):
                         max_equal_path_id = folder.get("Id")
                         equal_path_num += 1
                 except Exception as err:
-                    ExceptionUtils.exception_traceback(err)
+                    print(str(err))
                     continue
             if max_equal_path_id:
                 return max_equal_path_id if equal_path_num == 1 else library.get("Id")
@@ -460,6 +534,13 @@ class Emby(_IMediaClient):
         except Exception as e:
             ExceptionUtils.exception_traceback(e)
             return {}
+
+    def get_play_url(self, item_id):
+        """
+        拼装媒体播放链接
+        :param item_id: 媒体的的ID
+        """
+        return f"{self._play_host}web/index.html#!/item?id={item_id}&context=home&serverId={self._serverid}"
 
     def get_items(self, parent):
         """
@@ -533,28 +614,28 @@ class Emby(_IMediaClient):
                 eventItem['item_id'] = message.get('Item', {}).get('SeriesId')
                 eventItem['season_id'] = message.get('Item', {}).get('ParentIndexNumber')
                 eventItem['episode_id'] = message.get('Item', {}).get('IndexNumber')
-                eventItem['tmdb_id'] = message.get('Item', {}).get('ProviderIds', {}).get('Tmdb')
-                if message.get('Item', {}).get('Overview') and len(message.get('Item', {}).get('Overview')) > 100:
-                    eventItem['overview'] = str(message.get('Item', {}).get('Overview'))[:100] + "..."
-                else:
-                    eventItem['overview'] = message.get('Item', {}).get('Overview')
-                eventItem['percentage'] = message.get('TranscodingInfo', {}).get('CompletionPercentage')
-                if not eventItem['percentage']:
-                    eventItem['percentage'] = message.get('PlaybackInfo', {}).get('PositionTicks') / \
-                                              message.get('Item', {}).get('RunTimeTicks') * 100
+            elif message.get('Item', {}).get('Type') == 'Audio':
+                eventItem['item_type'] = "AUD"
+                album = message.get('Item', {}).get('Album')
+                file_name = message.get('Item', {}).get('FileName')
+                eventItem['item_name'] = album
+                eventItem['overview'] = file_name
+                eventItem['item_id'] = message.get('Item', {}).get('AlbumId')
             else:
                 eventItem['item_type'] = "MOV"
                 eventItem['item_name'] = "%s %s" % (
                     message.get('Item', {}).get('Name'), "(" + str(message.get('Item', {}).get('ProductionYear')) + ")")
                 eventItem['item_path'] = message.get('Item', {}).get('Path')
                 eventItem['item_id'] = message.get('Item', {}).get('Id')
-                eventItem['tmdb_id'] = message.get('Item', {}).get('ProviderIds', {}).get('Tmdb')
-                if len(message.get('Item', {}).get('Overview')) > 100:
-                    eventItem['overview'] = str(message.get('Item', {}).get('Overview'))[:100] + "..."
-                else:
-                    eventItem['overview'] = message.get('Item', {}).get('Overview')
-                eventItem['percentage'] = message.get('TranscodingInfo', {}).get('CompletionPercentage')
-                if not eventItem['percentage']:
+
+            eventItem['tmdb_id'] = message.get('Item', {}).get('ProviderIds', {}).get('Tmdb')
+            if message.get('Item', {}).get('Overview') and len(message.get('Item', {}).get('Overview')) > 100:
+                eventItem['overview'] = str(message.get('Item', {}).get('Overview'))[:100] + "..."
+            else:
+                eventItem['overview'] = message.get('Item', {}).get('Overview')
+            eventItem['percentage'] = message.get('TranscodingInfo', {}).get('CompletionPercentage')
+            if not eventItem['percentage']:
+                if message.get('PlaybackInfo', {}).get('PositionTicks'):
                     eventItem['percentage'] = message.get('PlaybackInfo', {}).get('PositionTicks') / \
                                               message.get('Item', {}).get('RunTimeTicks') * 100
         if message.get('Session'):

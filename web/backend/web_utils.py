@@ -2,7 +2,7 @@ import cn2an
 
 from app.media import Media, Bangumi, DouBan
 from app.media.meta import MetaInfo
-from app.utils import StringUtils, ExceptionUtils, SystemUtils, RequestUtils
+from app.utils import StringUtils, ExceptionUtils, SystemUtils, RequestUtils, IpUtils
 from app.utils.types import MediaType
 from config import Config
 from version import APP_VERSION
@@ -15,6 +15,8 @@ class WebUtils:
         """
         根据IP址查询真实地址
         """
+        if not IpUtils.is_ipv4(ip):
+            return ""
         url = 'https://sp0.baidu.com/8aQDcjqpAAV3otqbppnN2DJv/api.php?co=&resource_id=6006&t=1529895387942&ie=utf8' \
               '&oe=gbk&cb=op_aladdin_callback&format=json&tn=baidu&' \
               'cb=jQuery110203920624944751099_1529894588086&_=1529894588088&query=%s' % ip
@@ -64,7 +66,7 @@ class WebUtils:
         return None, None, False
 
     @staticmethod
-    def get_mediainfo_from_id(mtype, mediaid):
+    def get_mediainfo_from_id(mtype, mediaid, wait=False):
         """
         根据TMDB/豆瓣/BANGUMI获取媒体信息
         """
@@ -74,12 +76,15 @@ class WebUtils:
         if str(mediaid).startswith("DB:"):
             # 豆瓣
             doubanid = mediaid[3:]
-            info = DouBan().get_douban_detail(doubanid=doubanid, mtype=mtype)
+            info = DouBan().get_douban_detail(doubanid=doubanid, mtype=mtype, wait=wait)
             if not info:
                 return None
             title = info.get("title")
             original_title = info.get("original_title")
             year = info.get("year")
+            # 支持自动识别类型
+            if not mtype:
+                mtype = MediaType.TV if info.get("episodes_count") else MediaType.MOVIE
             if original_title:
                 media_info = Media().get_media_info(title=f"{original_title} {year}",
                                                     mtype=mtype,
@@ -105,6 +110,7 @@ class WebUtils:
                 media_info = Media().get_media_info(title=f"{title_cn} {year}",
                                                     mtype=MediaType.TV,
                                                     append_to_response="all")
+            media_info.douban_id, info = DouBan().search_douban(media_info)
         else:
             # TMDB
             info = Media().get_tmdb_info(tmdbid=mediaid,
@@ -114,7 +120,10 @@ class WebUtils:
                 return None
             media_info = MetaInfo(title=info.get("title") if mtype == MediaType.MOVIE else info.get("name"))
             media_info.set_tmdb_info(info)
-
+        if info.get("rating"):
+            media_info.vote_average = info.get("rating").get("value")
+        else:
+            media_info.vote_average = None
         return media_info
 
     @staticmethod
@@ -182,4 +191,3 @@ class WebUtils:
                 else:
                     EndPage = total_page
         return range(StartPage, EndPage + 1)
-

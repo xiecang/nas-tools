@@ -6,6 +6,7 @@ from config import Config
 from app.mediaserver.client._base import _IMediaClient
 from plexapi.myplex import MyPlexAccount
 from plexapi.server import PlexServer
+from plexapi import media
 
 
 class Plex(_IMediaClient):
@@ -193,6 +194,7 @@ class Plex(_IMediaClient):
                 "season_num": episode.seasonNumber,
                 "episode_num": episode.index
             })
+        return ret_tvs
 
     def get_no_exists_episodes(self, meta_info, season, total_num):
         """
@@ -214,10 +216,53 @@ class Plex(_IMediaClient):
         total_episodes = [episode for episode in range(1, total_num + 1)]
         return list(set(total_episodes).difference(set(exists_episodes)))
 
-    @staticmethod
-    def get_image_by_id(**kwargs):
+    def get_episode_image_by_id(self, item_id, season_id, episode_id):
         """
-        根据ItemId从Plex查询图片地址，该函数Plex下不使用
+        根据itemid、season_id、episode_id从Plex查询图片地址
+        :param item_id: 在Plex中具体的一集的ID
+        :param season_id: 季,目前没有使用
+        :param episode_id: 集,目前没有使用
+        :return: 图片对应在TMDB中的URL
+        """
+        if not self._plex:
+            return None
+        try:
+            images = self._plex.fetchItems('/library/metadata/%s/posters' % item_id, cls=media.Poster)
+            for image in images:
+                if hasattr(image, 'key') and image.key.startswith('http'):
+                    return image.key
+            return None
+        except Exception as e:
+            ExceptionUtils.exception_traceback(e)
+            log.error(f"【{self.client_name}】获取剧集封面出错：" + str(e))
+            return None
+
+    def get_remote_image_by_id(self, item_id, image_type):
+        """
+        根据ItemId从Plex查询图片地址
+        :param item_id: 在Emby中的ID
+        :param image_type: 图片的类型，Poster或者Backdrop等
+        :return: 图片对应在TMDB中的URL
+        """
+        if not self._plex:
+            return None
+        try:
+            if image_type == "Poster":
+                images = self._plex.fetchItems('/library/metadata/%s/posters' % item_id, cls=media.Poster)
+            else:
+                images = self._plex.fetchItems('/library/metadata/%s/arts' % item_id, cls=media.Art)
+            for image in images:
+                if hasattr(image, 'key') and image.key.startswith('http'):
+                    return image.key
+        except Exception as e:
+            ExceptionUtils.exception_traceback(e)
+            log.error(f"【{self.client_name}】获取封面出错：" + str(e))
+        return None
+
+    def get_local_image_by_id(self, item_id):
+        """
+        根据ItemId从媒体服务器查询有声书图片地址
+        :param item_id: 在Emby中的ID
         """
         return None
 
@@ -253,7 +298,6 @@ class Plex(_IMediaClient):
             libraries.append({"id": library.key, "name": library.title})
         return libraries
 
-    @staticmethod
     def get_iteminfo(self, itemid):
         """
         获取单个项目详情
@@ -267,6 +311,13 @@ class Plex(_IMediaClient):
         except Exception as err:
             ExceptionUtils.exception_traceback(err)
             return {}
+
+    def get_play_url(self, item_id):
+        """
+        拼装媒体播放链接
+        :param item_id: 媒体的的ID
+        """
+        return f'https://app.plex.tv/desktop/#!/server/{self._plex.machineIdentifier}/details?key={item_id}'
 
     def get_items(self, parent):
         """
@@ -295,8 +346,7 @@ class Plex(_IMediaClient):
                            "tmdbid": ids['tmdb_id'],
                            "imdbid": ids['imdb_id'],
                            "tvdbid": ids['tvdb_id'],
-                           "path": path,
-                           "json": str(item.__dict__)}
+                           "path": path}
         except Exception as err:
             ExceptionUtils.exception_traceback(err)
         yield {}
@@ -360,8 +410,7 @@ class Plex(_IMediaClient):
                     "S" + str(message.get('Metadata', {}).get('parentIndex')),
                     "E" + str(message.get('Metadata', {}).get('index')),
                     message.get('Metadata', {}).get('title'))
-
-                eventItem['item_id'] = message.get('Metadata', {}).get('grandparentKey')
+                eventItem['item_id'] = message.get('Metadata', {}).get('ratingKey')
                 eventItem['season_id'] = message.get('Metadata', {}).get('parentIndex')
                 eventItem['episode_id'] = message.get('Metadata', {}).get('index')
 
@@ -373,10 +422,7 @@ class Plex(_IMediaClient):
                 eventItem['item_type'] = "MOV"
                 eventItem['item_name'] = "%s %s" % (
                     message.get('Metadata', {}).get('title'), "(" + str(message.get('Metadata', {}).get('year')) + ")")
-
-                ids = self.__get_ids(message.get('Metadata', {}).get('Guid', {}))
-                eventItem['tmdb_id'] = ids['tmdb_id']
-
+                eventItem['item_id'] = message.get('Metadata', {}).get('ratingKey')
                 if len(message.get('Metadata', {}).get('summary')) > 100:
                     eventItem['overview'] = str(message.get('Metadata', {}).get('summary'))[:100] + "..."
                 else:

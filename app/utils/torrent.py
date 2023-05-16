@@ -3,8 +3,10 @@ import os.path
 import re
 from urllib.parse import unquote
 
-from bencode import bdecode
+from bencode import bdecode, bencode
+import hashlib
 
+import log
 from app.utils.http_utils import RequestUtils
 from app.utils.types import MediaType
 from config import Config
@@ -26,12 +28,12 @@ class Torrent:
         :param ua: 站点UserAgent
         :param referer: 关联地址，有的网站需要这个否则无法下载
         :param proxy: 是否使用内置代理
-        :return: 种子保存路径、种子内容、种子文件列表主目录、种子文件列表、错误信息
+        :return: 种子Hash、种子保存路径、种子内容、种子文件列表主目录、种子文件列表、错误信息
         """
         if not url:
-            return None, None, "", [], "URL为空"
+            return "", None, None, "", [], "URL为空"
         if url.startswith("magnet:"):
-            return None, url, "", [], f"{url} 为磁力链接"
+            return "", None, url, "", [], f"{url} 为磁力链接"
         try:
             # 下载保存种子文件
             file_path, content, errmsg = self.save_torrent_file(url=url,
@@ -40,14 +42,14 @@ class Torrent:
                                                                 referer=referer,
                                                                 proxy=proxy)
             if not file_path:
-                return None, content, "", [], errmsg
+                return "", None, content, "", [], errmsg
             # 解析种子文件
-            files_folder, files, retmsg = self.get_torrent_files(file_path)
+            hash, files_folder, files, retmsg = self.get_torrent_files(file_path)
             # 种子文件路径、种子内容、种子文件列表主目录、种子文件列表、错误信息
-            return file_path, content, files_folder, files, retmsg
+            return hash, file_path, content, files_folder, files, retmsg
 
         except Exception as err:
-            return None, None, "", [], "下载种子文件出现异常：%s" % str(err)
+            return "", None, None, "", [], "下载种子文件出现异常：%s" % str(err)
 
     def save_torrent_file(self, url, cookie=None, ua=None, referer=None, proxy=False):
         """
@@ -75,13 +77,49 @@ class Torrent:
                 return None, None, "未下载到种子数据"
             # 解析内容格式
             if req.text and str(req.text).startswith("magnet:"):
+                # 磁力链接
                 return None, req.text, "磁力链接"
+            elif req.text and "下载种子文件" in req.text:
+                # 首次下载提示页面
+                skip_flag = False
+                try:
+                    form = re.findall(r'<form.*?action="(.*?)".*?>(.*?)</form>', req.text, re.S)
+                    if form:
+                        action = form[0][0]
+                        inputs = re.findall(r'<input.*?name="(.*?)".*?value="(.*?)".*?>', form[0][1], re.S)
+                        if action and inputs:
+                            data = {}
+                            for item in inputs:
+                                data[item[0]] = item[1]
+                            # 改写req
+                            req = RequestUtils(
+                                headers=ua,
+                                cookies=cookie,
+                                referer=referer,
+                                proxies=Config().get_proxies() if proxy else None
+                            ).post_res(url=action, data=data)
+                            if req and req.status_code == 200:
+                                # 检查是不是种子文件，如果不是抛出异常
+                                bdecode(req.content)
+                                # 跳过成功
+                                skip_flag = True
+                            elif req is not None:
+                                log.warn(f"触发了站点首次种子下载，且无法自动跳过，"
+                                         f"返回码：{req.status_code}，错误原因：{req.reason}")
+                            else:
+                                log.warn(f"触发了站点首次种子下载，且无法自动跳过：{url}")
+                except Exception as err:
+                    log.warn(f"触发了站点首次种子下载，尝试自动跳过时出现错误：{str(err)}，链接：{url}")
+
+                if not skip_flag:
+                    return None, None, "种子数据有误，请确认链接是否正确，如为PT站点则需手工在站点下载一次种子"
             else:
+                # 检查是不是种子文件，如果不是仍然抛出异常
                 try:
                     bdecode(req.content)
                 except Exception as err:
                     print(str(err))
-                    return None, None, "种子数据有误，请确认链接是否正确，如为PT站点则需手工在站点下载一次种子"
+                    return None, None, "种子数据有误，请确认链接是否正确"
             # 读取种子文件名
             file_name = self.__get_url_torrent_filename(req, url)
             # 种子文件路径
@@ -93,6 +131,8 @@ class Torrent:
                 f.write(file_content)
         elif req is None:
             return None, None, "无法打开链接：%s" % url
+        elif req.status_code == 429:
+            return None, None, "触发站点流控，请稍后重试"
         else:
             return None, None, "下载种子出错，状态码：%s" % req.status_code
 
@@ -102,7 +142,7 @@ class Torrent:
     def get_torrent_files(path):
         """
         解析Torrent文件，获取文件清单
-        :return: 种子文件列表主目录、种子文件列表、错误信息
+        :return: 种子hash, 种子文件列表主目录、种子文件列表、错误信息
         """
         if not path or not os.path.exists(path):
             return "", [], f"种子文件不存在：{path}"
@@ -110,6 +150,7 @@ class Torrent:
         file_folder = ""
         try:
             torrent = bdecode(open(path, 'rb').read())
+            hash = hashlib.sha1(bencode(torrent.get("info"))).hexdigest()
             if torrent.get("info"):
                 files = torrent.get("info", {}).get("files") or []
                 if files:
@@ -120,8 +161,15 @@ class Torrent:
                 else:
                     file_names.append(torrent.get("info", {}).get("name"))
         except Exception as err:
-            return file_folder, file_names, "解析种子文件异常：%s" % str(err)
-        return file_folder, file_names, ""
+            return hash, file_folder, file_names, "解析种子文件异常：%s" % str(err)
+        return hash, file_folder, file_names, ""
+
+    @staticmethod
+    def convert_magnet_to_hash(magnet):
+        ret = re.findall(r"magnet:\?xt=urn:btih:([0-9A-Fa-f]+)&dn", magnet)
+        if len(ret) > 0:
+            return ret[0].lower()
+        return None
 
     def read_torrent_content(self, path):
         """
@@ -130,16 +178,16 @@ class Torrent:
         """
         if not path or not os.path.exists(path):
             return None, "", [], "种子文件不存在：%s" % path
-        content, retmsg, file_folder, files = None, "", "", []
+        hash, content, retmsg, file_folder, files = "", None, "", "", []
         try:
             # 读取种子文件内容
             with open(path, 'rb') as f:
                 content = f.read()
             # 解析种子文件
-            file_folder, files, retmsg = self.get_torrent_files(path)
+            hash, file_folder, files, retmsg = self.get_torrent_files(path)
         except Exception as e:
             retmsg = "读取种子文件出错：%s" % str(e)
-        return content, file_folder, files, retmsg
+        return hash, content, file_folder, files, retmsg
 
     @staticmethod
     def __get_url_torrent_filename(req, url):

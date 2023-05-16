@@ -1,14 +1,15 @@
+import time
+
+from apscheduler.schedulers.background import BackgroundScheduler
+
 from app.downloader import Downloader
+from app.helper.security_helper import SecurityHelper
 from app.mediaserver import MediaServer
 from app.plugins import EventHandler
 from app.plugins.modules._base import _IPluginModule
 from app.utils import ExceptionUtils
-from app.utils.types import DownloaderType, MediaServerType, EventType
-from app.helper.security_helper import SecurityHelper
-from apscheduler.schedulers.background import BackgroundScheduler
+from app.utils.types import MediaServerType, EventType
 from config import Config
-
-import log
 
 
 class SpeedLimiter(_IPluginModule):
@@ -19,11 +20,13 @@ class SpeedLimiter(_IPluginModule):
     # 插件图标
     module_icon = "SpeedLimiter.jpg"
     # 主题色
-    module_color = "bg-blue"
+    module_color = "#183883"
     # 插件版本
     module_version = "1.0"
     # 插件作者
     module_author = "Shurelol"
+    # 作者主页
+    author_url = "https://github.com/Shurelol"
     # 插件配置项ID前缀
     module_config_prefix = "speedlimit_"
     # 加载顺序
@@ -132,6 +135,25 @@ class SpeedLimiter(_IPluginModule):
                         },
                     ]
                 ]
+            },
+            {
+                'type': 'details',
+                'summary': '任务间隔',
+                'tooltip': '设置任务执行间隔,单位为秒，默认时间300秒；应优先通过配置Emby/Jellyfin/Plex的webhook发送播放事件给NAStool来触发自动限速，而非定时执行检查',
+                'content': [
+                    [
+                        {
+                            'required': "",
+                            'type': 'text',
+                            'content': [
+                                {
+                                    'id': 'interval',
+                                    'placeholder': '300'
+                                }
+                            ]
+                        }
+                    ]
+                ]
             }
         ]
 
@@ -159,19 +181,26 @@ class SpeedLimiter(_IPluginModule):
             try:
                 # 下载限速
                 self._download_limit = int(float(config.get("download_limit") or 0))
-                # 上传限速
-                self._upload_limit = int(float(config.get("download_limit") or 0))
             except Exception as e:
                 ExceptionUtils.exception_traceback(e)
                 self._download_limit = 0
+            
+            try:
+                # 上传限速
+                self._upload_limit = int(float(config.get("upload_limit") or 0))
+            except Exception as e:
+                ExceptionUtils.exception_traceback(e)
                 self._upload_limit = 0
 
             # 限速服务开关
-            self._limit_enabled = True if self._download_limit or self._upload_limit else False
+            self._limit_enabled = True if self._download_limit or self._upload_limit or self._auto_limit else False
 
             # 不限速地址
             self._unlimited_ips["ipv4"] = config.get("ipv4") or "0.0.0.0/0"
             self._unlimited_ips["ipv6"] = config.get("ipv6") or "::/0"
+
+            # 任务时间间隔
+            self._interval = int(config.get("interval") or "300")
 
             # 下载器
             self._limited_downloader_ids = config.get("downloaders") or []
@@ -191,7 +220,7 @@ class SpeedLimiter(_IPluginModule):
                                     seconds=self._interval)
             self._scheduler.print_jobs()
             self._scheduler.start()
-            log.info("播放限速服务启动")
+            self.info("播放限速服务启动")
 
     def get_state(self):
         return self._limit_enabled
@@ -223,7 +252,7 @@ class SpeedLimiter(_IPluginModule):
                 upload_limit=upload_limit
             )
             if not self._limit_flag:
-                log.info(f"【Plugin】下载器 {limited_downloader_conf.get('name')} 开始限速")
+                self.info(f"下载器 {limited_downloader_conf.get('name')} 开始限速")
         self._limit_flag = True
 
     def __stop(self, limited_downloader_confs=None):
@@ -239,7 +268,7 @@ class SpeedLimiter(_IPluginModule):
                 upload_limit=0
             )
             if self._limit_flag:
-                log.info(f"【Plugin】下载器 {limited_downloader_conf.get('name')} 停止限速")
+                self.info(f"下载器 {limited_downloader_conf.get('name')} 停止限速")
         self._limit_flag = False
 
     @EventHandler.register(EventType.EmbyWebhook)
@@ -287,6 +316,9 @@ class SpeedLimiter(_IPluginModule):
 
         if _mediaserver_type != self._mediaserver.get_type():
             return
+        # plex的webhook时尝试sleep一段时间,以保证get_playing_sessions获取到正确的值
+        if not time_check and _mediaserver_type == MediaServerType.PLEX:
+            time.sleep(3)
         # 当前播放的会话
         playing_sessions = self._mediaserver.get_playing_sessions()
         # 本次是否限速

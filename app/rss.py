@@ -1,5 +1,6 @@
 import re
 import xml.dom.minidom
+import traceback
 from threading import Lock
 
 import log
@@ -12,6 +13,7 @@ from app.sites import Sites, SiteConf
 from app.subscribe import Subscribe
 from app.utils import DomUtils, RequestUtils, StringUtils, ExceptionUtils, RssTitleUtils, Torrent
 from app.utils.types import MediaType, SearchType
+from config import Config
 
 lock = Lock()
 
@@ -44,7 +46,13 @@ class Rss:
         """
         RSS订阅检索下载入口，由定时服务调用
         """
+        rss_items = {}
 
+        def __update_no_exist(rss_id, download_item, match_info, no_exists):
+            rss_items.setdefault(rss_id, {})
+            rss_items[rss_id].setdefault('media_list', []).append(download_item)
+            rss_items[rss_id]['match_info'] = match_info
+            rss_items[rss_id]['no_exists'] = no_exists
         if not self._sites:
             return
 
@@ -92,10 +100,7 @@ class Rss:
             else:
                 check_sites = list(set(check_sites))
 
-            # 匹配到的资源列表
-            rss_download_torrents = []
-            # 缺失的资源详情
-            rss_no_exists = {}
+            total_num = 0
             # 遍历站点资源
             for site_info in self._sites:
                 if not site_info:
@@ -110,6 +115,8 @@ class Rss:
                 if not rss_url:
                     log.info(f"【Rss】{site_name} 未配置rssurl，跳过...")
                     continue
+                # 站点信息
+                site_id = site_info.get("id")
                 site_cookie = site_info.get("cookie")
                 site_ua = site_info.get("ua")
                 # 是否解析种子详情
@@ -176,6 +183,7 @@ class Rss:
                             media_info=media_info,
                             rss_movies=rss_movies,
                             rss_tvs=rss_tvs,
+                            site_id=site_id,
                             site_filter_rule=site_fliter_rule,
                             site_cookie=site_cookie,
                             site_parse=site_parse,
@@ -196,83 +204,18 @@ class Rss:
                                                                                   tmdbid=media_info.tmdb_id))
                             if not media_info.tmdb_info:
                                 continue
-                            # 非洗版时检查本地是否存在
-                            if not match_info.get("over_edition"):
-                                if media_info.type == MediaType.MOVIE:
-                                    exist_flag, rss_no_exists, _ = self.downloader.check_exists_medias(
-                                        meta_info=media_info,
-                                        no_exists=rss_no_exists
-                                    )
-                                else:
-                                    # 从登记薄中获取缺失剧集
-                                    season = 1
-                                    if match_info.get("season"):
-                                        season = int(str(match_info.get("season")).replace("S", ""))
-                                    # 设定的总集数
-                                    total_ep = match_info.get("total")
-                                    # 设定的开始集数
-                                    current_ep = match_info.get("current_ep")
-                                    # 表登记的缺失集数
-                                    episodes = self.subscribe.get_subscribe_tv_episodes(match_info.get("id"))
-                                    if episodes is None:
-                                        episodes = []
-                                        if current_ep:
-                                            episodes = list(range(int(current_ep), int(total_ep) + 1))
-                                        rss_no_exists[media_info.tmdb_id] = [
-                                            {
-                                                "season": season,
-                                                "episodes": episodes,
-                                                "total_episodes": total_ep
-                                            }
-                                        ]
-                                    else:
-                                        rss_no_exists[media_info.tmdb_id] = [
-                                            {
-                                                "season": season,
-                                                "episodes": episodes,
-                                                "total_episodes": total_ep
-                                            }
-                                        ]
-                                    # 检查本地媒体库情况
-                                    exist_flag, library_no_exists, _ = self.downloader.check_exists_medias(
-                                        meta_info=media_info,
-                                        total_ep={season: total_ep}
-                                    )
-                                    # 取交集做为缺失集
-                                    rss_no_exists = Torrent.get_intersection_episodes(target=rss_no_exists,
-                                                                                      source=library_no_exists,
-                                                                                      title=media_info.tmdb_id)
-                                    if rss_no_exists.get(media_info.tmdb_id):
-                                        log.info("【Rss】%s 订阅缺失季集：%s" % (
-                                            media_info.get_title_string(),
-                                            rss_no_exists.get(media_info.tmdb_id)
-                                        ))
+                            over_edition = match_info.get("over_edition")
+                            exist_flag, no_exists = self.subscribe.get_no_exists(media_info, match_info, over_edition)
+                            if not over_edition and exist_flag:
                                 # 本地已存在
-                                if exist_flag:
-                                    continue
-                            # 洗版模式
-                            else:
-                                # 洗版时季集不完整的资源不要
-                                if media_info.type != MediaType.MOVIE \
-                                        and media_info.get_episode_list():
-                                    log.info(
-                                        f"【Rss】{media_info.get_title_string()}{media_info.get_season_string()} "
-                                        f"正在洗版，过滤掉季集不完整的资源：{title}"
-                                    )
-                                    continue
-                                if not self.subscribe.check_subscribe_over_edition(
-                                        rtype=media_info.type,
-                                        rssid=match_info.get("id"),
-                                        res_order=match_info.get("res_order")):
-                                    log.info(
-                                        f"【Rss】{media_info.get_title_string()}{media_info.get_season_string()} "
-                                        f"正在洗版，跳过低优先级或同优先级资源：{title}"
-                                    )
-                                    continue
-                        # 模糊匹配
+                                continue
                         else:
                             # 不做处理，直接下载
                             pass
+
+                        # 站点流控
+                        if self.sites.check_ratelimit(site_id):
+                            continue
 
                         # 设置种子信息
                         media_info.set_torrent_info(res_order=match_info.get("res_order"),
@@ -287,24 +230,26 @@ class Rss:
                         # 插入数据库历史记录
                         self.dbhelper.insert_rss_torrents(media_info)
                         # 加入下载列表
-                        if media_info not in rss_download_torrents:
-                            rss_download_torrents.append(media_info)
-                            res_num = res_num + 1
+
+                        __update_no_exist(match_info.get("id"), media_info, match_info, no_exists)
+                        res_num = res_num + 1
+                        total_num += 1
                     except Exception as e:
-                        ExceptionUtils.exception_traceback(e)
-                        log.error("【Rss】处理RSS发生错误：%s" % str(e))
+                        log.error("【Rss】处理RSS发生错误：" + "".join(traceback.format_exception(e)))
                         continue
                 log.info("【Rss】%s 处理结束，匹配到 %s 个有效资源" % (site_name, res_num))
-            log.info("【Rss】所有RSS处理结束，共 %s 个有效资源" % len(rss_download_torrents))
-            # 开始择优下载
-            self.download_rss_torrent(rss_download_torrents=rss_download_torrents,
-                                      rss_no_exists=rss_no_exists)
+            log.info("【Rss】所有RSS处理结束，共 %s 个有效资源" % total_num)
+            if not rss_items:
+                return
+            for rid, item in rss_items.items():
+                self.subscribe.subscribe_media(item['match_info'], item['media_list'], item['no_exists'])
 
     @staticmethod
-    def parse_rssxml(url):
+    def parse_rssxml(url, proxy=False):
         """
         解析RSS订阅URL，获取RSS中的种子信息
         :param url: RSS地址
+        :param proxy: 是否使用代理
         :return: 种子信息列表
         """
         _special_title_sites = {
@@ -317,7 +262,7 @@ class Rss:
             return []
         site_domain = StringUtils.get_url_domain(url)
         try:
-            ret = RequestUtils().get_res(url)
+            ret = RequestUtils(proxies=Config().get_proxies() if proxy else None).get_res(url)
             if not ret:
                 return []
             ret.encoding = ret.apparent_encoding
@@ -384,6 +329,7 @@ class Rss:
                           media_info,
                           rss_movies,
                           rss_tvs,
+                          site_id,
                           site_filter_rule,
                           site_cookie,
                           site_parse,
@@ -394,6 +340,7 @@ class Rss:
         :param media_info: 已识别的种子媒体信息
         :param rss_movies: 电影订阅清单
         :param rss_tvs: 电视剧订阅清单
+        :param site_id: 站点ID
         :param site_filter_rule: 站点过滤规则
         :param site_cookie: 站点的Cookie
         :param site_parse: 是否解析种子详情
@@ -451,7 +398,6 @@ class Rss:
                 # 媒体匹配成功
                 match_flag = True
                 match_rss_info = rss_info
-
                 break
         # 匹配电视剧
         elif rss_tvs:
@@ -498,10 +444,15 @@ class Rss:
                 match_flag = True
                 match_rss_info = rss_info
                 break
+
         # 名称匹配成功，开始过滤
         if match_flag:
             # 解析种子详情
             if site_parse:
+                # 站点流控
+                if self.sites.check_ratelimit(site_id):
+                    match_msg.append("触发站点流控")
+                    return False, match_msg, match_rss_info
                 # 检测Free
                 torrent_attr = self.siteconf.check_torrent_attr(torrent_url=media_info.page_url,
                                                                 cookie=site_cookie,
@@ -528,7 +479,9 @@ class Rss:
                 "restype": match_rss_info.get('filter_restype'),
                 "pix": match_rss_info.get('filter_pix'),
                 "team": match_rss_info.get('filter_team'),
-                "rule": filter_rule
+                "rule": filter_rule,
+                "include": match_rss_info.get('filter_include'),
+                "exclude": match_rss_info.get('filter_exclude'),
             }
             match_filter_flag, res_order, match_filter_msg = self.filter.check_torrent_filter(meta_info=media_info,
                                                                                               filter_args=filter_dict)
@@ -553,79 +506,3 @@ class Rss:
                 media_info.get_title_string(),
                 media_info.get_season_episode_string()))
             return False, match_msg, match_rss_info
-
-    def download_rss_torrent(self, rss_download_torrents, rss_no_exists):
-        """
-        根据缺失情况以及匹配到的结果选择下载种子
-        """
-
-        if not rss_download_torrents:
-            return
-
-        finished_rss_torrents = []
-        updated_rss_torrents = []
-
-        def __finish_rss(download_item):
-            """
-            完成订阅
-            """
-            if not download_item:
-                return
-            if not download_item.rssid \
-                    or download_item.rssid in finished_rss_torrents:
-                return
-            finished_rss_torrents.append(download_item.rssid)
-            self.subscribe.finish_rss_subscribe(rssid=download_item.rssid,
-                                                media=download_item)
-
-        def __update_tv_rss(download_item, left_media):
-            """
-            更新订阅集数
-            """
-            if not download_item or not left_media:
-                return
-            if not download_item.rssid \
-                    or download_item.rssid in updated_rss_torrents:
-                return
-            updated_rss_torrents.append(download_item.rssid)
-            self.subscribe.update_subscribe_tv_lack(rssid=download_item.rssid,
-                                                    media_info=download_item,
-                                                    seasoninfo=left_media)
-
-        def __update_over_edition(download_item):
-            """
-            更新洗版订阅
-            """
-            if not download_item:
-                return
-            if not download_item.rssid \
-                    or download_item.rssid in updated_rss_torrents:
-                return
-            if download_item.get_episode_list():
-                return
-            updated_rss_torrents.append(download_item.rssid)
-            self.subscribe.update_subscribe_over_edition(rtype=download_item.type,
-                                                         rssid=download_item.rssid,
-                                                         media=download_item)
-
-        # 去重择优后开始添加下载
-        download_items, left_medias = self.downloader.batch_download(SearchType.RSS,
-                                                                     rss_download_torrents,
-                                                                     rss_no_exists)
-        # 批量删除订阅
-        if download_items:
-            for item in download_items:
-                if not item.rssid:
-                    continue
-                if item.over_edition:
-                    # 更新洗版订阅
-                    __update_over_edition(item)
-                elif not left_medias or not left_medias.get(item.tmdb_id):
-                    # 删除电视剧订阅
-                    __finish_rss(item)
-                else:
-                    # 更新电视剧缺失剧集
-                    __update_tv_rss(item, left_medias.get(item.tmdb_id))
-            log.info("【Rss】实际下载了 %s 个资源" % len(download_items))
-        else:
-            log.info("【Rss】未下载到任何资源")

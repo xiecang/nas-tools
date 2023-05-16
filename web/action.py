@@ -16,14 +16,13 @@ from werkzeug.security import generate_password_hash
 import log
 from app.brushtask import BrushTask
 from app.conf import SystemConfig, ModuleConf
-from app.doubansync import DoubanSync
 from app.downloader import Downloader
 from app.filetransfer import FileTransfer
 from app.filter import Filter
 from app.helper import DbHelper, ProgressHelper, ThreadHelper, \
-    MetaHelper, DisplayHelper, WordsHelper, CookieCloudHelper, IndexerHelper
+    MetaHelper, DisplayHelper, WordsHelper, IndexerHelper
 from app.indexer import Indexer
-from app.media import Category, Media, Bangumi, DouBan
+from app.media import Category, Media, Bangumi, DouBan, Scraper
 from app.media.meta import MetaInfo, MetaBase
 from app.mediaserver import MediaServer
 from app.message import Message, MessageCenter
@@ -36,18 +35,265 @@ from app.subscribe import Subscribe
 from app.sync import Sync
 from app.torrentremover import TorrentRemover
 from app.utils import StringUtils, EpisodeFormat, RequestUtils, PathUtils, \
-    SystemUtils, ExceptionUtils
+    SystemUtils, ExceptionUtils, Torrent
 from app.utils.types import RmtMode, OsType, SearchType, SyncType, MediaType, MovieTypes, TvTypes, \
-    EventType
-from config import RMT_MEDIAEXT, TMDB_IMAGE_W500_URL, RMT_SUBEXT, Config
+    EventType, SystemConfigKey, RssType
+from config import RMT_MEDIAEXT, RMT_SUBEXT, Config
 from web.backend.search_torrents import search_medias_for_web, search_media_by_message
-from web.backend.user import UserAuth
+from web.backend.user import User
 from web.backend.web_utils import WebUtils
 
 
 class WebAction:
     dbhelper = None
     _actions = {}
+    user_menu = [
+        {
+            "name": "我的媒体库",
+            "level": 1,
+            "page": "index",
+            "icon": '\n                      <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><polyline points="5 12 3 12 12 3 21 12 19 12"></polyline><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7"></path><path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6"></path></svg>\n                    ',
+        }, {
+            "name": "探索",
+            "level": 2,
+            "list": [
+                {
+                    "name": "榜单推荐",
+                    "level": 2,
+                    "page": "ranking",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-align-box-bottom-center" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z"></path>\n                                <path d="M9 15v2"></path>\n                                <path d="M12 11v6"></path>\n                                <path d="M15 13v4"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "豆瓣电影",
+                    "level": 2,
+                    "page": "douban_movie",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-movie" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z"></path>\n                                <path d="M8 4l0 16"></path>\n                                <path d="M16 4l0 16"></path>\n                                <path d="M4 8l4 0"></path>\n                                <path d="M4 16l4 0"></path>\n                                <path d="M4 12l16 0"></path>\n                                <path d="M16 8l4 0"></path>\n                                <path d="M16 16l4 0"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "豆瓣电视剧",
+                    "level": 2,
+                    "page": "douban_tv",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-device-tv" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M3 7m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"></path>\n                                <path d="M16 3l-4 4l-4 -4"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "豆瓣想看",
+                    "level": 2,
+                    "page": "douban_wish",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-douban" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M4 20h16"></path>\n                                <path d="M5 4h14"></path>\n                                <path d="M8 8h8a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2v-2a2 2 0 0 1 2 -2z"></path>\n                                <path d="M16 14l-2 6"></path>\n                                <path d="M8 17l1 3"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "TMDB电影",
+                    "level": 2,
+                    "page": "tmdb_movie",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-movie" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z"></path>\n                                <path d="M8 4l0 16"></path>\n                                <path d="M16 4l0 16"></path>\n                                <path d="M4 8l4 0"></path>\n                                <path d="M4 16l4 0"></path>\n                                <path d="M4 12l16 0"></path>\n                                <path d="M16 8l4 0"></path>\n                                <path d="M16 16l4 0"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "TMDB电视剧",
+                    "level": 2,
+                    "page": "tmdb_tv",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-device-tv" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M3 7m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"></path>\n                                <path d="M16 3l-4 4l-4 -4"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "BANGUMI",
+                    "level": 2,
+                    "page": "bangumi",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-device-tv-old" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                 <path d="M3 7m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"></path>\n                                 <path d="M16 3l-4 4l-4 -4"></path>\n                                 <path d="M15 7v13"></path>\n                                 <path d="M18 15v.01"></path>\n                                 <path d="M18 12v.01"></path>\n                              </svg>\n                            ',
+                },
+            ],
+        }, {
+            "name": "资源搜索",
+            "level": 2,
+            "page": "search",
+            "icon": '\n                      <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><circle cx="10" cy="10" r="7"></circle><line x1="21" y1="21" x2="15" y2="15"></line></svg>\n                    ',
+        }, {
+            "name": "站点管理",
+            "level": 2,
+            "list": [
+                {
+                    "name": "站点维护",
+                    "level": 2,
+                    "page": "site",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-server-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><rect x="3" y="4" width="18" height="8" rx="3"></rect><rect x="3" y="12" width="18" height="8" rx="3"></rect><line x1="7" y1="8" x2="7" y2="8.01"></line><line x1="7" y1="16" x2="7" y2="16.01"></line><path d="M11 8h6"></path><path d="M11 16h6"></path></svg>\n                            ',
+                },
+                {
+                    "name": "数据统计",
+                    "level": 2,
+                    "page": "statistics",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chart-pie" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                 <path d="M10 3.2a9 9 0 1 0 10.8 10.8a1 1 0 0 0 -1 -1h-6.8a2 2 0 0 1 -2 -2v-7a.9 .9 0 0 0 -1 -.8"></path>\n                                 <path d="M15 3.5a9 9 0 0 1 5.5 5.5h-4.5a1 1 0 0 1 -1 -1v-4.5"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "刷流任务",
+                    "level": 2,
+                    "page": "brushtask",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check"list" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M9.615 20h-2.615a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v8"></path>\n                                <path d="M14 19l2 2l4 -4"></path>\n                                <path d="M9 8h4"></path>\n                                <path d="M9 12h2"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "站点资源",
+                    "level": 2,
+                    "page": "sitelist",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cloud-computing" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M6.657 16c-2.572 0 -4.657 -2.007 -4.657 -4.483c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.913 0 3.464 1.56 3.464 3.486c0 1.927 -1.551 3.487 -3.465 3.487h-11.878"></path>\n                                <path d="M12 16v5"></path>\n                                <path d="M16 16v4a1 1 0 0 0 1 1h4"></path>\n                                <path d="M8 16v4a1 1 0 0 1 -1 1h-4"></path>\n                              </svg>\n                            ',
+                },
+            ],
+        }, {
+            "name": "订阅管理",
+            "level": 2,
+            "list": [
+                {
+                    "name": "电影订阅",
+                    "level": 2,
+                    "page": "movie_rss",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-movie" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z"></path>\n                                <path d="M8 4l0 16"></path>\n                                <path d="M16 4l0 16"></path>\n                                <path d="M4 8l4 0"></path>\n                                <path d="M4 16l4 0"></path>\n                                <path d="M4 12l16 0"></path>\n                                <path d="M16 8l4 0"></path>\n                                <path d="M16 16l4 0"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "电视剧订阅",
+                    "level": 2,
+                    "page": "tv_rss",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-device-tv" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M3 7m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"></path>\n                                <path d="M16 3l-4 4l-4 -4"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "自定义订阅",
+                    "level": 2,
+                    "page": "user_rss",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-rss" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>\n                                <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>\n                                <path d="M12 17a3 3 0 0 0 -3 -3"></path>\n                                <path d="M15 17a6 6 0 0 0 -6 -6"></path>\n                                <path d="M9 17h.01"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "订阅日历",
+                    "level": 2,
+                    "page": "rss_calendar",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M4 5m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z"></path>\n                                <path d="M16 3l0 4"></path>\n                                <path d="M8 3l0 4"></path>\n                                <path d="M4 11l16 0"></path>\n                                <path d="M11 15l1 0"></path>\n                                <path d="M12 15l0 3"></path>\n                              </svg>\n                            ',
+                },
+            ],
+        }, {
+            "name": "下载管理",
+            "level": 2,
+            "list": [
+                {
+                    "name": "正在下载",
+                    "level": 2,
+                    "page": "downloading",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-loader" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M12 6l0 -3"></path>\n                                <path d="M16.25 7.75l2.15 -2.15"></path>\n                                <path d="M18 12l3 0"></path>\n                                <path d="M16.25 16.25l2.15 2.15"></path>\n                                <path d="M12 18l0 3"></path>\n                                <path d="M7.75 16.25l-2.15 2.15"></path>\n                                <path d="M6 12l-3 0"></path>\n                                <path d="M7.75 7.75l-2.15 -2.15"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "已下载",
+                    "level": 2,
+                    "page": "downloaded",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-download" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"></path><polyline points="7 11 12 16 17 11"></polyline><line x1="12" y1="4" x2="12" y2="16"></line></svg>\n                            ',
+                },
+                {
+                    "name": "自动删种",
+                    "level": 2,
+                    "page": "torrent_remove",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-download-off" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 1.83 -1.19"></path>\n                                <path d="M7 11l5 5l2 -2m2 -2l1 -1"></path>\n                                <path d="M12 4v4m0 4v4"></path>\n                                <path d="M3 3l18 18"></path>\n                              </svg>\n                            ',
+                },
+            ],
+        }, {
+            "name": "媒体整理",
+            "level": 1,
+            "list": [
+                {
+                    "name": "文件管理",
+                    "level": 1,
+                    "page": "mediafile",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-pencil" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>\n                                <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>\n                                <path d="M10 18l5 -5a1.414 1.414 0 0 0 -2 -2l-5 5v2h2z"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "手动识别",
+                    "level": 1,
+                    "page": "unidentification",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-accessible" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"></path>\n                                <path d="M10 16.5l2 -3l2 3m-2 -3v-2l3 -1m-6 0l3 1"></path>\n                                <circle cx="12" cy="7.5" r=".5" fill="currentColor"></circle>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "历史记录",
+                    "level": 1,
+                    "page": "history",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-history" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M12 8l0 4l2 2"></path>\n                                <path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "TMDB缓存",
+                    "level": 1,
+                    "page": "tmdbcache",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-headlessui" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M6.744 4.325l7.82 -1.267a4.456 4.456 0 0 1 5.111 3.686l1.267 7.82a4.456 4.456 0 0 1 -3.686 5.111l-7.82 1.267a4.456 4.456 0 0 1 -5.111 -3.686l-1.267 -7.82a4.456 4.456 0 0 1 3.686 -5.111z"></path>\n                                <path d="M7.252 7.704l7.897 -1.28a1 1 0 0 1 1.147 .828l.36 2.223l-9.562 3.51l-.67 -4.134a1 1 0 0 1 .828 -1.147z"></path>\n                              </svg>\n                            ',
+                },
+            ],
+        }, {
+            "name": "服务",
+            "level": 1,
+            "page": "service",
+            "icon": '\n                      <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-layout-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><rect x="4" y="4" width="6" height="5" rx="2"></rect><rect x="4" y="13" width="6" height="7" rx="2"></rect><rect x="14" y="4" width="6" height="7" rx="2"></rect><rect x="14" y="15" width="6" height="5" rx="2"></rect></svg>\n                    ',
+        }, {
+            "name": "系统设置",
+            "also": "设置",
+            "level": 1,
+            "list": [
+                {
+                    "name": "基础设置",
+                    "level": 1,
+                    "page": "basic",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-settings" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"></path><circle cx="12" cy="12" r="3"></circle></svg>\n                            ',
+                },
+                {
+                    "name": "用户管理",
+                    "level": 2,
+                    "page": "users",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-users" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M9 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"></path>\n                                <path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"></path>\n                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>\n                                <path d="M21 21v-2a4 4 0 0 0 -3 -3.85"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "媒体库",
+                    "level": 1,
+                    "page": "library",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-stereo-glasses" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M8 3h-2l-3 9"></path>\n                                <path d="M16 3h2l3 9"></path>\n                                <path d="M3 12v7a1 1 0 0 0 1 1h4.586a1 1 0 0 0 .707 -.293l2 -2a1 1 0 0 1 1.414 0l2 2a1 1 0 0 0 .707 .293h4.586a1 1 0 0 0 1 -1v-7h-18z"></path>\n                                <path d="M7 16h1"></path>\n                                <path d="M16 16h1"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "目录同步",
+                    "level": 1,
+                    "page": "directorysync",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-refresh" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"></path>\n                                <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "消息通知",
+                    "level": 2,
+                    "page": "notification",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-bell" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M10 5a2 2 0 0 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6"></path>\n                                <path d="M9 17v1a3 3 0 0 0 6 0v-1"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "过滤规则",
+                    "level": 2,
+                    "page": "filterrule",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-filter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M5.5 5h13a1 1 0 0 1 .5 1.5l-5 5.5l0 7l-4 -3l0 -4l-5 -5.5a1 1 0 0 1 .5 -1.5"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "自定义识别词",
+                    "level": 1,
+                    "page": "customwords",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-a-b" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M3 16v-5.5a2.5 2.5 0 0 1 5 0v5.5m0 -4h-5"></path>\n                                <path d="M12 6l0 12"></path>\n                                <path d="M16 16v-8h3a2 2 0 0 1 0 4h-3m3 0a2 2 0 0 1 0 4h-3"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "索引器",
+                    "level": 2,
+                    "page": "indexer",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-list-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M15 15m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"></path>\n                                <path d="M18.5 18.5l2.5 2.5"></path>\n                                <path d="M4 6h16"></path>\n                                <path d="M4 12h4"></path>\n                                <path d="M4 18h4"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "下载器",
+                    "level": 2,
+                    "page": "downloader",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-download" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"></path>\n                                <path d="M7 11l5 5l5 -5"></path>\n                                <path d="M12 4l0 12"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "媒体服务器",
+                    "level": 2,
+                    "page": "mediaserver",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-server-cog" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                <path d="M3 4m0 3a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3z"></path>\n                                <path d="M12 20h-6a3 3 0 0 1 -3 -3v-2a3 3 0 0 1 3 -3h10.5"></path>\n                                <path d="M18 18m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"></path>\n                                <path d="M18 14.5v1.5"></path>\n                                <path d="M18 20v1.5"></path>\n                                <path d="M21.032 16.25l-1.299 .75"></path>\n                                <path d="M16.27 19l-1.3 .75"></path>\n                                <path d="M14.97 16.25l1.3 .75"></path>\n                                <path d="M19.733 19l1.3 .75"></path>\n                                <path d="M7 8v.01"></path>\n                                <path d="M7 16v.01"></path>\n                              </svg>\n                            ',
+                },
+                {
+                    "name": "插件",
+                    "level": 1,
+                    "page": "plugin",
+                    "icon": '\n                              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-codesandbox" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">\n                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>\n                                 <path d="M20 7.5v9l-4 2.25l-4 2.25l-4 -2.25l-4 -2.25v-9l4 -2.25l4 -2.25l4 2.25z"></path>\n                                 <path d="M12 12l4 -2.25l4 -2.25"></path>\n                                 <path d="M12 12l0 9"></path>\n                                 <path d="M12 12l-4 -2.25l-4 -2.25"></path>\n                                 <path d="M20 12l-4 2v4.75"></path>\n                                 <path d="M4 12l4 2l0 4.75"></path>\n                                 <path d="M8 5.25l4 2.25l4 -2.25"></path>\n                              </svg>\n                            ',
+                },
+            ],
+        },
+    ]
 
     def __init__(self):
         self.dbhelper = DbHelper()
@@ -64,7 +310,7 @@ class WebAction:
             "del_unknown_path": self.__del_unknown_path,
             "rename": self.__rename,
             "rename_udf": self.__rename_udf,
-            "delete_history": self.__delete_history,
+            "delete_history": self.delete_history,
             "logging": self.__logging,
             "version": self.__version,
             "update_site": self.__update_site,
@@ -99,6 +345,7 @@ class WebAction:
             "add_brushtask": self.__add_brushtask,
             "del_brushtask": self.__del_brushtask,
             "brushtask_detail": self.__brushtask_detail,
+            "update_brushtask_state": self.__update_brushtask_state,
             "name_test": self.__name_test,
             "rule_test": self.__rule_test,
             "net_test": self.__net_test,
@@ -124,6 +371,7 @@ class WebAction:
             "get_userrss_task": self.__get_userrss_task,
             "delete_userrss_task": self.__delete_userrss_task,
             "update_userrss_task": self.__update_userrss_task,
+            "check_userrss_task": self.__check_userrss_task,
             "get_rssparser": self.__get_rssparser,
             "delete_rssparser": self.__delete_rssparser,
             "update_rssparser": self.__update_rssparser,
@@ -165,7 +413,7 @@ class WebAction:
             "get_directorysync": self.get_directorysync,
             "get_users": self.get_users,
             "get_filterrules": self.get_filterrules,
-            "get_downloading": self.get_downloading,
+            "get_torrents": self.get_torrents,
             "test_site": self.__test_site,
             "get_sub_path": self.__get_sub_path,
             "rename_file": self.__rename_file,
@@ -191,13 +439,12 @@ class WebAction:
             "delete_torrent_remove_task": self.__delete_torrent_remove_task,
             "get_remove_torrents": self.__get_remove_torrents,
             "auto_remove_torrents": self.__auto_remove_torrents,
-            "get_douban_history": self.get_douban_history,
+            "douban_sync": self.douban_sync,
             "delete_douban_history": self.__delete_douban_history,
             "list_brushtask_torrents": self.__list_brushtask_torrents,
             "set_system_config": self.__set_system_config,
             "get_site_user_statistics": self.get_site_user_statistics,
             "send_custom_message": self.send_custom_message,
-            "cookiecloud_sync": self.__cookiecloud_sync,
             "media_detail": self.media_detail,
             "media_similar": self.__media_similar,
             "media_recommendations": self.__media_recommendations,
@@ -209,12 +456,26 @@ class WebAction:
             "get_season_episodes": self.__get_season_episodes,
             "get_user_menus": self.get_user_menus,
             "get_top_menus": self.get_top_menus,
-            "auth_user_level": self.__auth_user_level,
+            "auth_user_level": self.auth_user_level,
             "update_downloader": self.__update_downloader,
             "del_downloader": self.__del_downloader,
             "check_downloader": self.__check_downloader,
             "get_downloaders": self.__get_downloaders,
             "test_downloader": self.__test_downloader,
+            "get_indexer_statistics": self.__get_indexer_statistics,
+            "media_path_scrap": self.__media_path_scrap,
+            "get_default_rss_setting": self.get_default_rss_setting,
+            "get_movie_rss_items": self.get_movie_rss_items,
+            "get_tv_rss_items": self.get_tv_rss_items,
+            "get_ical_events": self.get_ical_events,
+            "install_plugin": self.install_plugin,
+            "uninstall_plugin": self.uninstall_plugin,
+            "get_plugin_apps": self.get_plugin_apps,
+            "get_plugin_page": self.get_plugin_page,
+            "get_plugin_state": self.get_plugin_state,
+            "get_plugins_conf": self.get_plugins_conf,
+            "update_category_config": self.update_category_config,
+            "get_category_config": self.get_category_config
         }
 
     def action(self, cmd, data=None):
@@ -248,7 +509,7 @@ class WebAction:
             "data": result
         }
 
-    @staticmethod
+    @ staticmethod
     def stop_service():
         """
         关闭服务
@@ -266,7 +527,7 @@ class WebAction:
         # 关闭插件
         PluginManager().stop_service()
 
-    @staticmethod
+    @ staticmethod
     def start_service():
         # 加载索引器配置
         IndexerHelper()
@@ -309,7 +570,7 @@ class WebAction:
         else:
             os.system("pm2 restart NAStool")
 
-    @staticmethod
+    @ staticmethod
     def handle_message_job(msg, in_from=SearchType.OT, user_id=None, user_name=None):
         """
         处理消息事件
@@ -322,12 +583,13 @@ class WebAction:
             "/pts": {"func": SiteSignin().signin, "desp": "站点签到"},
             "/rst": {"func": Sync().transfer_all_sync, "desp": "目录同步"},
             "/rss": {"func": Rss().rssdownload, "desp": "RSS订阅"},
-            "/db": {"func": DoubanSync().sync, "desp": "豆瓣同步"},
+            "/db": {"func": WebAction().douban_sync, "desp": "豆瓣同步"},
             "/ssa": {"func": Subscribe().subscribe_search_all, "desp": "订阅搜索"},
             "/tbl": {"func": WebAction().truncate_blacklist, "desp": "清理转移缓存"},
             "/trh": {"func": WebAction().truncate_rsshistory, "desp": "清理RSS缓存"},
             "/utf": {"func": WebAction().unidentification, "desp": "重新识别"},
-            "/udt": {"func": WebAction().update_system, "desp": "系统更新"}
+            "/udt": {"func": WebAction().update_system, "desp": "系统更新"},
+            "/sta": {"func": WebAction().user_statistics, "desp": "数据统计"}
         }
 
         # 触发事件
@@ -352,7 +614,7 @@ class WebAction:
             ThreadHelper().start_thread(search_media_by_message,
                                         (msg, in_from, user_id, user_name))
 
-    @staticmethod
+    @ staticmethod
     def set_config_value(cfg, cfg_key, cfg_value):
         """
         根据Key设置配置值
@@ -408,7 +670,7 @@ class WebAction:
 
         return cfg
 
-    @staticmethod
+    @ staticmethod
     def set_config_directory(cfg, oper, cfg_key, cfg_value, update_value=None):
         """
         更新目录数据
@@ -467,7 +729,7 @@ class WebAction:
                     cfg[keys[0]][keys[1]] = cfg_value.replace("\\", "/")
         return cfg
 
-    @staticmethod
+    @ staticmethod
     def __sch(data):
         """
         启动定时服务
@@ -478,7 +740,7 @@ class WebAction:
             "ptsignin": SiteSignin().signin,
             "sync": Sync().transfer_all_sync,
             "rssdownload": Rss().rssdownload,
-            "douban": DoubanSync().sync,
+            "douban": WebAction().douban_sync,
             "subscribe_search_all": Subscribe().subscribe_search_all,
         }
         sch_item = data.get("item")
@@ -486,7 +748,7 @@ class WebAction:
             ThreadHelper().start_thread(commands.get(sch_item), ())
         return {"retmsg": "服务已启动", "item": sch_item}
 
-    @staticmethod
+    @ staticmethod
     def __search(data):
         """
         WEB检索资源
@@ -540,7 +802,7 @@ class WebAction:
                 return {"retcode": -1, "retmsg": ret_msg}
         return {"retcode": 0, "retmsg": ""}
 
-    @staticmethod
+    @ staticmethod
     def __download_link(data):
         """
         从WEB添加下载链接
@@ -576,23 +838,56 @@ class WebAction:
             return {"code": 1, "msg": ret_msg or "如连接正常，请检查下载任务是否存在"}
         return {"code": 0, "msg": "下载成功"}
 
-    @staticmethod
+    @ staticmethod
     def __download_torrent(data):
         """
-        从种子文件添加下载
+        从种子文件或者URL链接添加下载
+        files：文件地址的列表，urls：种子链接地址列表或者单个链接地址
         """
         dl_dir = data.get("dl_dir")
         dl_setting = data.get("dl_setting")
-        files = data.get("files")
-        if not files:
-            return {"code": -1, "msg": "没有种子文件"}
+        files = data.get("files") or []
+        urls = data.get("urls") or []
+        if not files and not urls:
+            return {"code": -1, "msg": "没有种子文件或者种子链接"}
+        # 下载种子
         for file_item in files:
             if not file_item:
                 continue
             file_name = file_item.get("upload", {}).get("filename")
             file_path = os.path.join(Config().get_temp_path(), file_name)
             media_info = Media().get_media_info(title=file_name)
-            media_info.site = "WEB"
+            if media_info:
+                media_info.site = "WEB"
+            # 添加下载
+            Downloader().download(media_info=media_info,
+                                  download_dir=dl_dir,
+                                  download_setting=dl_setting,
+                                  torrent_file=file_path,
+                                  in_from=SearchType.WEB,
+                                  user_name=current_user.username)
+        # 下载链接
+        if urls and not isinstance(urls, list):
+            urls = [urls]
+        for url in urls:
+            if not url:
+                continue
+            # 查询站点
+            site_info = Sites().get_sites(siteurl=url)
+            if not site_info:
+                return {"code": -1, "msg": "根据链接地址未匹配到站点"}
+            # 下载种子文件，并读取信息
+            file_path, _, _, _, retmsg = Torrent().get_torrent_info(
+                url=url,
+                cookie=site_info.get("cookie"),
+                ua=site_info.get("ua"),
+                proxy=site_info.get("proxy")
+            )
+            if not file_path:
+                return {"code": -1, "msg": f"下载种子文件失败： {retmsg}"}
+            media_info = Media().get_media_info(title=os.path.basename(file_path))
+            if media_info:
+                media_info.site = "WEB"
             # 添加下载
             Downloader().download(media_info=media_info,
                                   download_dir=dl_dir,
@@ -603,7 +898,7 @@ class WebAction:
 
         return {"code": 0, "msg": "添加下载完成！"}
 
-    @staticmethod
+    @ staticmethod
     def __pt_start(data):
         """
         开始下载
@@ -613,7 +908,7 @@ class WebAction:
             Downloader().start_torrents(ids=tid)
         return {"retcode": 0, "id": tid}
 
-    @staticmethod
+    @ staticmethod
     def __pt_stop(data):
         """
         停止下载
@@ -623,7 +918,7 @@ class WebAction:
             Downloader().stop_torrents(ids=tid)
         return {"retcode": 0, "id": tid}
 
-    @staticmethod
+    @ staticmethod
     def __pt_remove(data):
         """
         删除下载
@@ -633,7 +928,7 @@ class WebAction:
             Downloader().delete_torrents(ids=tid, delete_file=True)
         return {"retcode": 0, "id": tid}
 
-    @staticmethod
+    @ staticmethod
     def __pt_info(data):
         """
         查询具体种子的信息
@@ -690,6 +985,7 @@ class WebAction:
         season = data.get("season")
         episode_format = data.get("episode_format")
         episode_details = data.get("episode_details")
+        episode_part = data.get("episode_part")
         episode_offset = data.get("episode_offset")
         min_filesize = data.get("min_filesize")
         if mtype in MovieTypes:
@@ -710,6 +1006,7 @@ class WebAction:
                                                     media_type=media_type,
                                                     episode_format=episode_format,
                                                     episode_details=episode_details,
+                                                    episode_part=episode_part,
                                                     episode_offset=episode_offset,
                                                     need_fix_all=need_fix_all,
                                                     min_filesize=min_filesize,
@@ -737,6 +1034,7 @@ class WebAction:
         season = data.get("season")
         episode_format = data.get("episode_format")
         episode_details = data.get("episode_details")
+        episode_part = data.get("episode_part")
         episode_offset = data.get("episode_offset")
         min_filesize = data.get("min_filesize")
         if mtype in MovieTypes:
@@ -752,6 +1050,7 @@ class WebAction:
                                                     media_type=media_type,
                                                     episode_format=episode_format,
                                                     episode_details=episode_details,
+                                                    episode_part=episode_part,
                                                     episode_offset=episode_offset,
                                                     min_filesize=min_filesize,
                                                     tmdbid=tmdbid,
@@ -761,13 +1060,14 @@ class WebAction:
         else:
             return {"retcode": 2, "retmsg": ret_msg}
 
-    @staticmethod
+    @ staticmethod
     def __manual_transfer(inpath,
                           syncmod,
                           outpath=None,
                           media_type=None,
                           episode_format=None,
                           episode_details=None,
+                          episode_part=None,
                           episode_offset=None,
                           min_filesize=None,
                           tmdbid=None,
@@ -798,6 +1098,7 @@ class WebAction:
                                                                episode=(
                                                                    EpisodeFormat(episode_format,
                                                                                  episode_details,
+                                                                                 episode_part,
                                                                                  episode_offset),
                                                                    need_fix_all),
                                                                min_filesize=min_filesize,
@@ -812,17 +1113,18 @@ class WebAction:
                                                                episode=(
                                                                    EpisodeFormat(episode_format,
                                                                                  episode_details,
+                                                                                 episode_part,
                                                                                  episode_offset),
                                                                    need_fix_all),
                                                                min_filesize=min_filesize,
                                                                udf_flag=True)
         return succ_flag, ret_msg
 
-    def __delete_history(self, data):
+    def delete_history(self, data):
         """
         删除识别记录及文件
         """
-        logids = data.get('logids')
+        logids = data.get('logids') or []
         flag = data.get('flag')
         for logid in logids:
             # 读取历史记录
@@ -850,9 +1152,9 @@ class WebAction:
                     # 删除源文件
                     del_flag, del_msg = self.delete_media_file(source_path, source_filename)
                     if not del_flag:
-                        log.error(f"【Web】{del_msg}")
+                        log.error(del_msg)
                     else:
-                        log.info(f"【Web】{del_msg}")
+                        log.info(del_msg)
                         # 触发源文件删除事件
                         EventManager().send_event(EventType.SourceFileDeleted, {
                             "media_info": media_info,
@@ -864,9 +1166,9 @@ class WebAction:
                     if dest_path and dest_filename:
                         del_flag, del_msg = self.delete_media_file(dest_path, dest_filename)
                         if not del_flag:
-                            log.error(f"【Web】{del_msg}")
+                            log.error(del_msg)
                         else:
-                            log.info(f"【Web】{del_msg}")
+                            log.info(del_msg)
                             # 触发媒体库文件删除事件
                             EventManager().send_event(EventType.LibraryFileDeleted, {
                                 "media_info": media_info,
@@ -941,43 +1243,14 @@ class WebAction:
                                     ExceptionUtils.exception_traceback(e)
         return {"retcode": 0}
 
-    @staticmethod
+    @ staticmethod
     def delete_media_file(filedir, filename):
         """
         删除媒体文件，空目录也会被删除
         """
-        filedir = os.path.normpath(filedir).replace("\\", "/")
-        file = os.path.join(filedir, filename)
-        try:
-            if not os.path.exists(file):
-                return False, f"{file} 不存在"
-            os.remove(file)
-            nfoname = f"{os.path.splitext(filename)[0]}.nfo"
-            nfofile = os.path.join(filedir, nfoname)
-            if os.path.exists(nfofile):
-                os.remove(nfofile)
-            # 检查空目录并删除
-            if re.findall(r"^S\d{2}|^Season", os.path.basename(filedir), re.I):
-                # 当前是季文件夹，判断并删除
-                seaon_dir = filedir
-                if seaon_dir.count('/') > 1 and not PathUtils.get_dir_files(seaon_dir, exts=RMT_MEDIAEXT):
-                    shutil.rmtree(seaon_dir)
-                # 媒体文件夹
-                media_dir = os.path.dirname(seaon_dir)
-            else:
-                media_dir = filedir
-            # 检查并删除媒体文件夹，非根目录且目录大于二级，且没有媒体文件时才会删除
-            if media_dir != '/' \
-                    and media_dir.count('/') > 1 \
-                    and not re.search(r'[a-zA-Z]:/$', media_dir) \
-                    and not PathUtils.get_dir_files(media_dir, exts=RMT_MEDIAEXT):
-                shutil.rmtree(media_dir)
-            return True, f"{file} 删除成功"
-        except Exception as e:
-            ExceptionUtils.exception_traceback(e)
-            return True, f"{file} 删除失败"
+        return FileTransfer().delete_file_path(filedir, filename)
 
-    @staticmethod
+    @ staticmethod
     def __logging(data):
         """
         查询实时日志
@@ -1010,7 +1283,7 @@ class WebAction:
                     log_list = []
         return {"loglist": log_list}
 
-    @staticmethod
+    @ staticmethod
     def __version(data):
         """
         检查新版本
@@ -1085,7 +1358,7 @@ class WebAction:
         BrushTask().init_config()
         return {"code": ret}
 
-    @staticmethod
+    @ staticmethod
     def __get_site(data):
         """
         查询单个站点信息
@@ -1108,7 +1381,7 @@ class WebAction:
             ret = []
         return {"code": 0, "site": ret, "site_free": site_free, "site_2xfree": site_2xfree, "site_hr": site_hr}
 
-    @staticmethod
+    @ staticmethod
     def __get_sites(data):
         """
         查询多个站点信息
@@ -1164,27 +1437,29 @@ class WebAction:
                 self.restart_server()
         else:
             # 清除git代理
-            os.system("git config --global --unset http.proxy")
-            os.system("git config --global --unset https.proxy")
+            os.system("sudo git config --global --unset http.proxy")
+            os.system("sudo git config --global --unset https.proxy")
             # 设置git代理
             proxy = Config().get_proxies() or {}
             http_proxy = proxy.get("http")
             https_proxy = proxy.get("https")
             if http_proxy or https_proxy:
                 os.system(
-                    f"git config --global http.proxy {http_proxy or https_proxy}")
+                    f"sudo git config --global http.proxy {http_proxy or https_proxy}")
                 os.system(
-                    f"git config --global https.proxy {https_proxy or http_proxy}")
+                    f"sudo git config --global https.proxy {https_proxy or http_proxy}")
             # 清理
-            os.system("git clean -dffx")
+            os.system("sudo git clean -dffx")
             # 升级
             branch = "dev" if os.environ.get(
                 "NASTOOL_VERSION") == "dev" else "master"
-            os.system(f"git fetch --depth 1 origin {branch}")
-            os.system(f"git reset --hard origin/{branch}")
-            os.system("git submodule update --init --recursive")
+            os.system(f"sudo git fetch --depth 1 origin {branch}")
+            os.system(f"sudo git reset --hard origin/{branch}")
+            os.system("sudo git submodule update --init --recursive")
             # 安装依赖
-            os.system('pip install -r /nas-tools/requirements.txt')
+            os.system('sudo pip install -r /nas-tools/requirements.txt')
+            # 修复权限
+            os.system('sudo chown -R nt:nt /nas-tools')
             # 重启
             self.restart_server()
         return {"code": 0}
@@ -1200,7 +1475,7 @@ class WebAction:
             ExceptionUtils.exception_traceback(e)
             return {"code": 1, "msg": str(e)}
 
-    @staticmethod
+    @ staticmethod
     def __logout(data):
         """
         注销
@@ -1360,8 +1635,9 @@ class WebAction:
         """
         添加RSS订阅
         """
-        name = data.get("name")
         _subscribe = Subscribe()
+        channel = RssType.Manual if data.get("in_form") == "manual" else RssType.Auto
+        name = data.get("name")
         year = data.get("year")
         keyword = data.get("keyword")
         season = data.get("season")
@@ -1374,6 +1650,8 @@ class WebAction:
         filter_pix = data.get("filter_pix")
         filter_team = data.get("filter_team")
         filter_rule = data.get("filter_rule")
+        filter_include = data.get("filter_include")
+        filter_exclude = data.get("filter_exclude")
         save_path = data.get("save_path")
         download_setting = data.get("download_setting")
         total_ep = data.get("total_ep")
@@ -1382,6 +1660,7 @@ class WebAction:
         page = data.get("page")
         mtype = MediaType.MOVIE if data.get(
             "type") in MovieTypes else MediaType.TV
+
         media_info = None
         if isinstance(season, list):
             code = 0
@@ -1390,6 +1669,7 @@ class WebAction:
                 code, msg, media_info = _subscribe.add_rss_subscribe(mtype=mtype,
                                                                      name=name,
                                                                      year=year,
+                                                                     channel=channel,
                                                                      keyword=keyword,
                                                                      season=sea,
                                                                      fuzzy_match=fuzzy_match,
@@ -1401,6 +1681,8 @@ class WebAction:
                                                                      filter_pix=filter_pix,
                                                                      filter_team=filter_team,
                                                                      filter_rule=filter_rule,
+                                                                     filter_include=filter_include,
+                                                                     filter_exclude=filter_exclude,
                                                                      save_path=save_path,
                                                                      download_setting=download_setting,
                                                                      rssid=rssid)
@@ -1410,6 +1692,7 @@ class WebAction:
             code, msg, media_info = _subscribe.add_rss_subscribe(mtype=mtype,
                                                                  name=name,
                                                                  year=year,
+                                                                 channel=channel,
                                                                  keyword=keyword,
                                                                  season=season,
                                                                  fuzzy_match=fuzzy_match,
@@ -1421,6 +1704,8 @@ class WebAction:
                                                                  filter_pix=filter_pix,
                                                                  filter_team=filter_team,
                                                                  filter_rule=filter_rule,
+                                                                 filter_include=filter_include,
+                                                                 filter_exclude=filter_exclude,
                                                                  save_path=save_path,
                                                                  download_setting=download_setting,
                                                                  total_ep=total_ep,
@@ -1601,7 +1886,7 @@ class WebAction:
             "seasons": seasons
         }
 
-    @staticmethod
+    @ staticmethod
     def __test_connection(data):
         """
         测试连通性
@@ -1658,7 +1943,7 @@ class WebAction:
             return {"code": 0, "success": False}
         return {"code": -1, "success": False, 'message': '操作失败'}
 
-    @staticmethod
+    @ staticmethod
     def __refresh_rss(data):
         """
         重新搜索RSS
@@ -1672,7 +1957,7 @@ class WebAction:
             ThreadHelper().start_thread(Subscribe().subscribe_search_tv, (rssid,))
         return {"code": 0, "page": page}
 
-    @staticmethod
+    @ staticmethod
     def get_system_message(lst_time):
         messages = MessageCenter().get_system_messages(lst_time=lst_time)
         if messages:
@@ -1691,29 +1976,20 @@ class WebAction:
         system_msg = self.get_system_message(lst_time=lst_time)
         messages = system_msg.get("message")
         lst_time = system_msg.get("lst_time")
-        message_html = []
+        ret_messages = []
         for message in list(reversed(messages)):
-            level = "bg-red" if message.get("level") == "ERROR" else ""
             content = re.sub(r"#+", "<br>",
                              re.sub(r"<[^>]+>", "",
                                     re.sub(r"<br/?>", "####", message.get("content"), flags=re.IGNORECASE)))
-            message_html.append(f"""
-            <div class="list-group-item">
-              <div class="row align-items-center">
-                <div class="col-auto">
-                  <span class="status-dot {level} d-block"></span>
-                </div>
-                <div class="col text-truncate">
-                  <span class="text-wrap">{message.get("title")}</span>
-                  <div class="d-block text-muted text-truncate mt-n1 text-wrap">{content}</div>
-                  <div class="d-block text-muted text-truncate mt-n1 text-wrap">{message.get("time")}</div>
-                </div>
-              </div>
-            </div>
-            """)
-        return {"code": 0, "message": message_html, "lst_time": lst_time}
+            ret_messages.append({
+                "level": "bg-red" if message.get("level") == "ERROR" else "",
+                "title": message.get("title"),
+                "content": content,
+                "time": message.get("time")
+            })
+        return {"code": 0, "message": ret_messages, "lst_time": lst_time}
 
-    @staticmethod
+    @ staticmethod
     def __delete_tmdb_cache(data):
         """
         删除tmdb缓存
@@ -1722,7 +1998,7 @@ class WebAction:
             MetaHelper().save_meta_data()
         return {"code": 0}
 
-    @staticmethod
+    @ staticmethod
     def __movie_calendar_data(data):
         """
         查询电影上映日期
@@ -1763,8 +2039,8 @@ class WebAction:
                 return {"code": 1, "retmsg": "没有TMDBID信息"}
             if not tmdb_info:
                 return {"code": 1, "retmsg": "无法查询到TMDB信息"}
-            poster_path = TMDB_IMAGE_W500_URL % tmdb_info.get('poster_path') if tmdb_info.get(
-                'poster_path') else ""
+            poster_path = Config().get_tmdbimage_url(tmdb_info.get('poster_path')) \
+                if tmdb_info.get('poster_path') else ""
             title = tmdb_info.get('title')
             vote_average = tmdb_info.get("vote_average")
             release_date = tmdb_info.get('release_date')
@@ -1782,7 +2058,7 @@ class WebAction:
                         "rssid": rssid
                         }
 
-    @staticmethod
+    @ staticmethod
     def __tv_calendar_data(data):
         """
         查询电视剧上映日期
@@ -1804,7 +2080,9 @@ class WebAction:
             if not release_date:
                 return {"code": 1, "retmsg": "上映日期不正确"}
             else:
-                return {"code": 0,
+                return {
+                    "code": 0,
+                    "events": [{
                         "type": "电视剧",
                         "title": title,
                         "start": release_date,
@@ -1813,7 +2091,8 @@ class WebAction:
                         "poster": poster_path,
                         "vote_average": vote_average,
                         "rssid": rssid
-                        }
+                    }]
+                }
         else:
             if tid:
                 tmdb_info = Media().get_tmdb_tv_season_detail(tmdbid=tid, season=season)
@@ -1826,13 +2105,11 @@ class WebAction:
             if not tmdb_info.get("poster_path"):
                 tv_tmdb_info = Media().get_tmdb_info(mtype=MediaType.TV, tmdbid=tid)
                 if tv_tmdb_info:
-                    poster_path = TMDB_IMAGE_W500_URL % tv_tmdb_info.get(
-                        "poster_path")
+                    poster_path = Config().get_tmdbimage_url(tv_tmdb_info.get('poster_path'))
                 else:
                     poster_path = ""
             else:
-                poster_path = TMDB_IMAGE_W500_URL % tmdb_info.get(
-                    "poster_path")
+                poster_path = Config().get_tmdbimage_url(tmdb_info.get('poster_path'))
             year = air_date[0:4] if air_date else ""
             for episode in tmdb_info.get("episodes"):
                 episode_events.append({
@@ -1854,7 +2131,7 @@ class WebAction:
                 })
             return {"code": 0, "events": episode_events}
 
-    @staticmethod
+    @ staticmethod
     def __rss_detail(data):
         rid = data.get("rssid")
         mtype = data.get("rsstype")
@@ -1872,7 +2149,7 @@ class WebAction:
             rssdetail["type"] = "TV"
         return {"code": 0, "detail": rssdetail}
 
-    @staticmethod
+    @ staticmethod
     def __modify_tmdb_cache(data):
         """
         修改TMDB缓存的标题
@@ -1908,7 +2185,9 @@ class WebAction:
         brushtask_downloader = data.get("brushtask_downloader")
         brushtask_totalsize = data.get("brushtask_totalsize")
         brushtask_state = data.get("brushtask_state")
+        brushtask_rssurl = data.get("brushtask_rssurl")
         brushtask_label = data.get("brushtask_label")
+        brushtask_savepath = data.get("brushtask_savepath")
         brushtask_transfer = 'Y' if data.get("brushtask_transfer") else 'N'
         brushtask_sendmessage = 'Y' if data.get(
             "brushtask_sendmessage") else 'N'
@@ -1955,10 +2234,12 @@ class WebAction:
             "name": brushtask_name,
             "site": brushtask_site,
             "free": brushtask_free,
+            "rssurl": brushtask_rssurl,
             "interval": brushtask_interval,
             "downloader": brushtask_downloader,
             "seed_size": brushtask_totalsize,
             "label": brushtask_label,
+            "savepath": brushtask_savepath,
             "transfer": brushtask_transfer,
             "state": brushtask_state,
             "rss_rule": rss_rule,
@@ -1983,7 +2264,7 @@ class WebAction:
             return {"code": 0}
         return {"code": 1}
 
-    @staticmethod
+    @ staticmethod
     def __brushtask_detail(data):
         """
         查询刷流任务详情
@@ -1995,19 +2276,39 @@ class WebAction:
 
         return {"code": 0, "task": brushtask}
 
+    def __update_brushtask_state(self, data):
+        """
+        批量暂停/开始刷流任务
+        """
+        try:
+            state = data.get("state")
+            task_ids = data.get("ids")
+            if state is not None:
+                if task_ids:
+                    for tid in task_ids:
+                        self.dbhelper.update_brushtask_state(state=state, tid=tid)
+                else:
+                    self.dbhelper.update_brushtask_state(state=state)
+            BrushTask().init_config()
+            return {"code": 0, "msg": ""}
+        except Exception as e:
+            ExceptionUtils.exception_traceback(e)
+            return {"code": 1, "msg": "刷流任务设置失败"}
+
     def __name_test(self, data):
         """
         名称识别测试
         """
         name = data.get("name")
+        subtitle = data.get("subtitle")
         if not name:
             return {"code": -1}
-        media_info = Media().get_media_info(title=name)
+        media_info = Media().get_media_info(title=name, subtitle=subtitle)
         if not media_info:
             return {"code": 0, "data": {"name": "无法识别"}}
         return {"code": 0, "data": self.mediainfo_dict(media_info)}
 
-    @staticmethod
+    @ staticmethod
     def mediainfo_dict(media_info):
         if not media_info:
             return {}
@@ -2044,7 +2345,7 @@ class WebAction:
             "offset_words": media_info.offset_words
         }
 
-    @staticmethod
+    @ staticmethod
     def __rule_test(data):
         title = data.get("title")
         subtitle = data.get("subtitle")
@@ -2064,7 +2365,7 @@ class WebAction:
             "order": 100 - res_order if res_order else 0
         }
 
-    @staticmethod
+    @ staticmethod
     def __net_test(data):
         target = data
         if target == "image.tmdb.org":
@@ -2090,7 +2391,7 @@ class WebAction:
         else:
             return {"res": False, "time": "%s 毫秒" % seconds}
 
-    @staticmethod
+    @ staticmethod
     def __get_site_activity(data):
         """
         查询site活动[上传，下载，魔力值]
@@ -2106,7 +2407,7 @@ class WebAction:
             {"dataset": SiteUserInfo().get_pt_site_activity_history(data["name"])})
         return resp
 
-    @staticmethod
+    @ staticmethod
     def __get_site_history(data):
         """
         查询site 历史[上传，下载]
@@ -2117,7 +2418,9 @@ class WebAction:
             return {"code": 1, "msg": "查询参数错误"}
 
         resp = {"code": 0}
-        _, _, site, upload, download = SiteUserInfo().get_pt_site_statistics_history(data["days"] + 1)
+        _, _, site, upload, download = SiteUserInfo().get_pt_site_statistics_history(
+            data["days"] + 1, data.get("end_day", None)
+        )
 
         # 调整为dataset组织数据
         dataset = [["site", "upload", "download"]]
@@ -2126,7 +2429,7 @@ class WebAction:
         resp.update({"dataset": dataset})
         return resp
 
-    @staticmethod
+    @ staticmethod
     def __get_site_seeding_info(data):
         """
         查询site 做种分布信息 大小，做种数
@@ -2212,7 +2515,7 @@ class WebAction:
         Filter().init_config()
         return {"code": 0}
 
-    @staticmethod
+    @ staticmethod
     def __filterrule_detail(data):
         rid = data.get("ruleid")
         groupid = data.get("groupid")
@@ -2264,7 +2567,7 @@ class WebAction:
                 # 豆瓣TOP250电影
                 res_list = DouBan().get_douban_top250_movie(CurrentPage)
             elif SubType == "dbzy":
-                # 豆瓣最新电视剧
+                # 豆瓣热门综艺
                 res_list = DouBan().get_douban_hot_show(CurrentPage)
             elif SubType == "dbct":
                 # 华语口碑剧集榜
@@ -2307,11 +2610,6 @@ class WebAction:
             medias = WebUtils.search_media_infos(
                 keyword=Keyword, source=Source, page=CurrentPage)
             res_list = [media.to_dict() for media in medias]
-        elif Type == "DOWNLOADED":
-            # 近期下载
-            res_list = self.get_downloaded({
-                "page": CurrentPage
-            }).get("Items")
         elif Type == "TRENDING":
             # TMDB流行趋势
             res_list = Media().get_tmdb_trending_all_week(page=CurrentPage)
@@ -2320,6 +2618,7 @@ class WebAction:
             mtype = MediaType.MOVIE if SubType in MovieTypes else MediaType.TV
             # 过滤参数 with_genres with_original_language
             params = data.get("params") or {}
+
             res_list = Media().get_tmdb_discover(mtype=mtype, page=CurrentPage, params=params)
         elif Type == "DOUBANTAG":
             # 豆瓣发现
@@ -2335,13 +2634,15 @@ class WebAction:
                                                    sort=sort,
                                                    tags=tags,
                                                    page=CurrentPage)
+        elif Type == "DOUBANWISH":
+            res_list = self.get_douban_wish(CurrentPage)
 
         # 补充存在与订阅状态
         for res in res_list:
-            fav, rssid = self.get_media_exists_flag(mtype=res.get("type"),
-                                                    title=res.get("title"),
-                                                    year=res.get("year"),
-                                                    mediaid=res.get("id"))
+            fav, rssid, item_url = self.get_media_exists_info(mtype=res.get("type"),
+                                                              title=res.get("title"),
+                                                              year=res.get("year"),
+                                                              mediaid=res.get("id"))
             res.update({
                 'fav': fav,
                 'rssid': rssid
@@ -2369,7 +2670,7 @@ class WebAction:
         else:
             return {"code": 0, "Items": []}
 
-    @staticmethod
+    @ staticmethod
     def parse_brush_rule_string(rules: dict):
         if not rules:
             return ""
@@ -2469,7 +2770,7 @@ class WebAction:
 
         return "<br>".join(rule_htmls)
 
-    @staticmethod
+    @ staticmethod
     def __clear_tmdb_cache(data):
         """
         清空TMDB缓存
@@ -2482,7 +2783,7 @@ class WebAction:
             return {"code": 0, "msg": str(e)}
         return {"code": 0}
 
-    @staticmethod
+    @ staticmethod
     def __check_site_attr(data):
         """
         检查站点标识
@@ -2497,7 +2798,7 @@ class WebAction:
             site_hr = True
         return {"code": 0, "site_free": site_free, "site_2xfree": site_2xfree, "site_hr": site_hr}
 
-    @staticmethod
+    @ staticmethod
     def __refresh_process(data):
         """
         刷新进度条
@@ -2508,7 +2809,7 @@ class WebAction:
         else:
             return {"code": 1, "value": 0, "text": "正在处理..."}
 
-    @staticmethod
+    @ staticmethod
     def __restory_backup(data):
         """
         解压恢复备份文件
@@ -2530,17 +2831,17 @@ class WebAction:
 
         return {"code": 1, "msg": "文件不存在"}
 
-    @staticmethod
+    @ staticmethod
     def __start_mediasync(data):
         """
         开始媒体库同步
         """
         librarys = data.get("librarys") or []
-        SystemConfig().set_system_config("SyncLibrary", librarys)
+        SystemConfig().set(key=SystemConfigKey.SyncLibrary, value=librarys)
         ThreadHelper().start_thread(MediaServer().sync_mediaserver, ())
         return {"code": 0}
 
-    @staticmethod
+    @ staticmethod
     def __mediasync_state(data):
         """
         获取媒体库同步数据情况
@@ -2554,7 +2855,7 @@ class WebAction:
                                         status.get("tv_count"),
                                         status.get("time"))}
 
-    @staticmethod
+    @ staticmethod
     def __get_tvseason_list(data):
         """
         获取剧集季列表
@@ -2588,7 +2889,7 @@ class WebAction:
             ]
         return {"code": 0, "seasons": seasons}
 
-    @staticmethod
+    @ staticmethod
     def __get_userrss_task(data):
         """
         获取自定义订阅详情
@@ -2611,11 +2912,22 @@ class WebAction:
         新增或修改自定义订阅
         """
         uses = data.get("uses")
+        address_parser = data.get("address_parser")
+        if not address_parser:
+            return {"code": 1}
+        address = list(dict(sorted(
+            {k.replace("address_", ""): y for k, y in address_parser.items() if k.startswith("address_")}.items(),
+            key=lambda x: int(x[0])
+        )).values())
+        parser = list(dict(sorted(
+            {k.replace("parser_", ""): y for k, y in address_parser.items() if k.startswith("parser_")}.items(),
+            key=lambda x: int(x[0])
+        )).values())
         params = {
             "id": data.get("id"),
             "name": data.get("name"),
-            "address": data.get("address"),
-            "parser": data.get("parser"),
+            "address": address,
+            "parser": parser,
             "interval": data.get("interval"),
             "uses": uses,
             "include": data.get("include"),
@@ -2624,6 +2936,7 @@ class WebAction:
             "state": data.get("state"),
             "save_path": data.get("save_path"),
             "download_setting": data.get("download_setting"),
+            "note": {"proxy": data.get("proxy")},
         }
         if uses == "D":
             params.update({
@@ -2646,6 +2959,26 @@ class WebAction:
             return {"code": 0}
         else:
             return {"code": 1}
+
+    def __check_userrss_task(self, data):
+        """
+        检测自定义订阅
+        """
+        try:
+            flag_dict = {"enable": True, "disable": False}
+            taskids = data.get("ids")
+            state = flag_dict.get(data.get("flag"))
+            if state is not None:
+                if taskids:
+                    for taskid in taskids:
+                        self.dbhelper.check_userrss_task(tid=taskid, state=state)
+                else:
+                    self.dbhelper.check_userrss_task(state=state)
+                RssChecker().init_config()
+            return {"code": 0, "msg": ""}
+        except Exception as e:
+            ExceptionUtils.exception_traceback(e)
+            return {"code": 1, "msg": "自定义订阅状态设置失败"}
 
     @staticmethod
     def __get_rssparser(data):
@@ -2682,17 +3015,17 @@ class WebAction:
         else:
             return {"code": 1}
 
-    @staticmethod
+    @ staticmethod
     def __run_userrss(data):
         RssChecker().check_task_rss(data.get("id"))
         return {"code": 0}
 
-    @staticmethod
+    @ staticmethod
     def __run_brushtask(data):
         BrushTask().check_task_rss(data.get("id"))
         return {"code": 0}
 
-    @staticmethod
+    @ staticmethod
     def __list_site_resources(data):
         resources = Indexer().list_builtin_resources(index_id=data.get("id"),
                                                      page=data.get("page"),
@@ -2702,13 +3035,15 @@ class WebAction:
         else:
             return {"code": 0, "data": resources}
 
-    @staticmethod
+    @ staticmethod
     def __list_rss_articles(data):
-        uses = RssChecker().get_rsstask_info(taskid=data.get("id")).get("uses")
+        task_info = RssChecker().get_rsstask_info(taskid=data.get("id"))
+        uses = task_info.get("uses")
+        address_count = len(task_info.get("address"))
         articles = RssChecker().get_rss_articles(data.get("id"))
         count = len(articles)
         if articles:
-            return {"code": 0, "data": articles, "count": count, "uses": uses}
+            return {"code": 0, "data": articles, "count": count, "uses": uses, "address_count": address_count}
         else:
             return {"code": 1, "msg": "未获取到报文"}
 
@@ -2743,18 +3078,21 @@ class WebAction:
         else:
             return {"code": 1, "msg": "无下载记录"}
 
-    @staticmethod
+    @ staticmethod
     def __rss_articles_check(data):
         if not data.get("articles"):
             return {"code": 2}
         res = RssChecker().check_rss_articles(
-            flag=data.get("flag"), articles=data.get("articles"))
+            taskid=data.get("taskid"),
+            flag=data.get("flag"),
+            articles=data.get("articles")
+        )
         if res:
             return {"code": 0}
         else:
             return {"code": 1}
 
-    @staticmethod
+    @ staticmethod
     def __rss_articles_download(data):
         if not data.get("articles"):
             return {"code": 2}
@@ -2957,9 +3295,12 @@ class WebAction:
             flag_dict = {"enable": 1, "disable": 0}
             ids_info = data.get("ids_info")
             enabled = flag_dict.get(data.get("flag"))
-            ids = [id_info.split("_")[1] for id_info in ids_info]
-            for wid in ids:
-                self.dbhelper.check_custom_word(wid=wid, enabled=enabled)
+            if not ids_info:
+                self.dbhelper.check_custom_word(enabled=enabled)
+            else:
+                ids = [id_info.split("_")[1] for id_info in ids_info]
+                for wid in ids:
+                    self.dbhelper.check_custom_word(wid=wid, enabled=enabled)
             WordsHelper().init_config()
             return {"code": 0, "msg": ""}
         except Exception as e:
@@ -2969,46 +3310,54 @@ class WebAction:
     def __export_custom_words(self, data):
         try:
             note = data.get("note")
-            ids_info = data.get("ids_info").split("@")
+            ids_info = data.get("ids_info")
             group_ids = []
             word_ids = []
-            for id_info in ids_info:
-                wid = id_info.split("_")
-                group_ids.append(wid[0])
-                word_ids.append(wid[1])
+            group_infos = []
+            word_infos = []
+            if ids_info:
+                ids_info = ids_info.split("@")
+                for id_info in ids_info:
+                    wid = id_info.split("_")
+                    group_ids.append(wid[0])
+                    word_ids.append(wid[1])
+                for group_id in group_ids:
+                    if group_id != "-1":
+                        group_info = self.dbhelper.get_custom_word_groups(gid=group_id)
+                        if group_info:
+                            group_infos.append(group_info[0])
+                for word_id in word_ids:
+                    word_info = self.dbhelper.get_custom_words(wid=word_id)
+                    if word_info:
+                        word_infos.append(word_info[0])
+            else:
+                group_infos = self.dbhelper.get_custom_word_groups()
+                word_infos = self.dbhelper.get_custom_words()
             export_dict = {}
-            for group_id in group_ids:
-                if group_id == "-1":
-                    export_dict["-1"] = {"id": -1,
-                                         "title": "通用",
-                                         "type": 1,
-                                         "words": {}, }
-                else:
-                    group_info = self.dbhelper.get_custom_word_groups(
-                        gid=group_id)
-                    if group_info:
-                        group_info = group_info[0]
-                        export_dict[str(group_info.ID)] = {"id": group_info.ID,
-                                                           "title": group_info.TITLE,
-                                                           "year": group_info.YEAR,
-                                                           "type": group_info.TYPE,
-                                                           "tmdbid": group_info.TMDBID,
-                                                           "season_count": group_info.SEASON_COUNT,
-                                                           "words": {}, }
-            for word_id in word_ids:
-                word_info = self.dbhelper.get_custom_words(wid=word_id)
-                if word_info:
-                    word_info = word_info[0]
-                    export_dict[str(word_info.GROUP_ID)]["words"][str(word_info.ID)] = {"id": word_info.ID,
-                                                                                        "replaced": word_info.REPLACED,
-                                                                                        "replace": word_info.REPLACE,
-                                                                                        "front": word_info.FRONT,
-                                                                                        "back": word_info.BACK,
-                                                                                        "offset": word_info.OFFSET,
-                                                                                        "type": word_info.TYPE,
-                                                                                        "season": word_info.SEASON,
-                                                                                        "regex": word_info.REGEX,
-                                                                                        "help": word_info.HELP, }
+            if not group_ids or "-1" in group_ids:
+                export_dict["-1"] = {"id": -1,
+                                     "title": "通用",
+                                     "type": 1,
+                                     "words": {}, }
+            for group_info in group_infos:
+                export_dict[str(group_info.ID)] = {"id": group_info.ID,
+                                                   "title": group_info.TITLE,
+                                                   "year": group_info.YEAR,
+                                                   "type": group_info.TYPE,
+                                                   "tmdbid": group_info.TMDBID,
+                                                   "season_count": group_info.SEASON_COUNT,
+                                                   "words": {}, }
+            for word_info in word_infos:
+                export_dict[str(word_info.GROUP_ID)]["words"][str(word_info.ID)] = {"id": word_info.ID,
+                                                                                    "replaced": word_info.REPLACED,
+                                                                                    "replace": word_info.REPLACE,
+                                                                                    "front": word_info.FRONT,
+                                                                                    "back": word_info.BACK,
+                                                                                    "offset": word_info.OFFSET,
+                                                                                    "type": word_info.TYPE,
+                                                                                    "season": word_info.SEASON,
+                                                                                    "regex": word_info.REGEX,
+                                                                                    "help": word_info.HELP, }
             export_string = json.dumps(export_dict) + "@@@@@@" + str(note)
             string = base64.b64encode(
                 export_string.encode("utf-8")).decode('utf-8')
@@ -3017,7 +3366,7 @@ class WebAction:
             ExceptionUtils.exception_traceback(e)
             return {"code": 1, "msg": str(e)}
 
-    @staticmethod
+    @ staticmethod
     def __analyse_import_custom_words_code(data):
         try:
             import_code = data.get('import_code')
@@ -3120,14 +3469,14 @@ class WebAction:
             ExceptionUtils.exception_traceback(e)
             return {"code": 1, "msg": str(e)}
 
-    @staticmethod
+    @ staticmethod
     def get_categories(data):
         if data.get("type") == "电影":
-            categories = Category().get_movie_categorys()
+            categories = Category().movie_categorys
         elif data.get("type") == "电视剧":
-            categories = Category().get_tv_categorys()
+            categories = Category().tv_categorys
         else:
-            categories = Category().get_anime_categorys()
+            categories = Category().anime_categorys
         return {"code": 0, "category": list(categories), "id": data.get("id"), "value": data.get("value")}
 
     def __delete_rss_history(self, data):
@@ -3151,6 +3500,7 @@ class WebAction:
             code, msg, _ = Subscribe().add_rss_subscribe(mtype=mtype,
                                                          name=rssinfo[0].NAME,
                                                          year=rssinfo[0].YEAR,
+                                                         channel=RssType.Auto,
                                                          season=season,
                                                          mediaid=rssinfo[0].TMDBID,
                                                          total_ep=rssinfo[0].TOTAL,
@@ -3216,91 +3566,55 @@ class WebAction:
             ExceptionUtils.exception_traceback(err)
             return {"code": 1, "msg": "数据格式不正确，%s" % str(err)}
 
-    @staticmethod
+    @ staticmethod
     def get_library_spacesize(data=None):
         """
         查询媒体库存储空间
         """
         # 磁盘空间
+        UsedSapce = 0
         UsedPercent = 0
-        TotalSpaceList = []
         media = Config().get_config('media')
-        if media:
-            # 电影目录
-            movie_paths = media.get('movie_path')
-            if not isinstance(movie_paths, list):
-                movie_paths = [movie_paths]
-            movie_used, movie_total = 0, 0
-            for movie_path in movie_paths:
-                if not movie_path:
-                    continue
-                used, total = SystemUtils.get_used_of_partition(movie_path)
-                if "%s-%s" % (used, total) not in TotalSpaceList:
-                    TotalSpaceList.append("%s-%s" % (used, total))
-                    movie_used += used
-                    movie_total += total
-            # 电视目录
-            tv_paths = media.get('tv_path')
-            if not isinstance(tv_paths, list):
-                tv_paths = [tv_paths]
-            tv_used, tv_total = 0, 0
-            for tv_path in tv_paths:
-                if not tv_path:
-                    continue
-                used, total = SystemUtils.get_used_of_partition(tv_path)
-                if "%s-%s" % (used, total) not in TotalSpaceList:
-                    TotalSpaceList.append("%s-%s" % (used, total))
-                    tv_used += used
-                    tv_total += total
-            # 动漫目录
-            anime_paths = media.get('anime_path')
-            if not isinstance(anime_paths, list):
-                anime_paths = [anime_paths]
-            anime_used, anime_total = 0, 0
-            for anime_path in anime_paths:
-                if not anime_path:
-                    continue
-                used, total = SystemUtils.get_used_of_partition(anime_path)
-                if "%s-%s" % (used, total) not in TotalSpaceList:
-                    TotalSpaceList.append("%s-%s" % (used, total))
-                    anime_used += used
-                    anime_total += total
-            # 总空间
-            TotalSpaceAry = []
-            if movie_total not in TotalSpaceAry:
-                TotalSpaceAry.append(movie_total)
-            if tv_total not in TotalSpaceAry:
-                TotalSpaceAry.append(tv_total)
-            if anime_total not in TotalSpaceAry:
-                TotalSpaceAry.append(anime_total)
-            TotalSpace = sum(TotalSpaceAry)
+        # 电影目录
+        movie_paths = media.get('movie_path')
+        if not isinstance(movie_paths, list):
+            movie_paths = [movie_paths]
+        # 电视目录
+        tv_paths = media.get('tv_path')
+        if not isinstance(tv_paths, list):
+            tv_paths = [tv_paths]
+        # 动漫目录
+        anime_paths = media.get('anime_path')
+        if not isinstance(anime_paths, list):
+            anime_paths = [anime_paths]
+        # 总空间、剩余空间
+        TotalSpace, FreeSpace = SystemUtils.calculate_space_usage(movie_paths + tv_paths + anime_paths)
+        if TotalSpace:
             # 已使用空间
-            UsedSapceAry = []
-            if movie_used not in UsedSapceAry:
-                UsedSapceAry.append(movie_used)
-            if tv_used not in UsedSapceAry:
-                UsedSapceAry.append(tv_used)
-            if anime_used not in UsedSapceAry:
-                UsedSapceAry.append(anime_used)
-            UsedSapce = sum(UsedSapceAry)
-            # 电影电视使用百分比格式化
-            if TotalSpace:
-                UsedPercent = "%0.1f" % ((UsedSapce / TotalSpace) * 100)
+            UsedSapce = TotalSpace - FreeSpace
+            # 百分比格式化
+            UsedPercent = "%0.1f" % ((UsedSapce / TotalSpace) * 100)
             # 总剩余空间 格式化
-            FreeSpace = "{:,} TB".format(
-                round((TotalSpace - UsedSapce) / 1024 / 1024 / 1024 / 1024, 2))
+            if FreeSpace > 1024:
+                FreeSpace = "{:,} TB".format(round(FreeSpace / 1024, 2))
+            else:
+                FreeSpace = "{:,} GB".format(round(FreeSpace, 2))
             # 总使用空间 格式化
-            UsedSapce = "{:,} TB".format(
-                round(UsedSapce / 1024 / 1024 / 1024 / 1024, 2))
+            if UsedSapce > 1024:
+                UsedSapce = "{:,} TB".format(round(UsedSapce / 1024, 2))
+            else:
+                UsedSapce = "{:,} GB".format(round(UsedSapce, 2))
             # 总空间 格式化
-            TotalSpace = "{:,} TB".format(
-                round(TotalSpace / 1024 / 1024 / 1024 / 1024, 2))
+            if TotalSpace > 1024:
+                TotalSpace = "{:,} TB".format(round(TotalSpace / 1024, 2))
+            else:
+                TotalSpace = "{:,} GB".format(round(TotalSpace, 2))
 
-            return {"code": 0,
-                    "UsedPercent": UsedPercent,
-                    "FreeSpace": FreeSpace,
-                    "UsedSapce": UsedSapce,
-                    "TotalSpace": TotalSpace}
+        return {"code": 0,
+                "UsedPercent": UsedPercent,
+                "FreeSpace": FreeSpace,
+                "UsedSapce": UsedSapce,
+                "TotalSpace": TotalSpace}
 
     def get_transfer_statistics(self, data=None):
         """
@@ -3336,7 +3650,7 @@ class WebAction:
             "AnimeNums": AnimeNums
         }
 
-    @staticmethod
+    @ staticmethod
     def get_library_mediacount(data=None):
         """
         查询媒体库统计数据
@@ -3357,7 +3671,7 @@ class WebAction:
         else:
             return {"code": -1, "msg": "媒体库服务器连接失败"}
 
-    @staticmethod
+    @ staticmethod
     def get_library_playhistory(data=None):
         """
         查询媒体库播放记录
@@ -3413,6 +3727,9 @@ class WebAction:
             mtype = item.TYPE or ""
             SE_key = item.ES_STRING if item.ES_STRING and mtype != "MOV" else "MOV"
             media_type = {"MOV": "电影", "TV": "电视剧", "ANI": "动漫"}.get(mtype)
+            # 只需要部分种子标签
+            labels = [label for label in str(item.NOTE).split("|")
+                      if label in ["官方", "官组", "中字", "国语", "特效", "特效字幕"]]
             # 种子信息
             torrent_item = {
                 "id": item.ID,
@@ -3429,7 +3746,8 @@ class WebAction:
                 "restype": restype,
                 "reseffect": reseffect,
                 "releasegroup": item.OTHERINFO,
-                "video_encode": video_encode
+                "video_encode": video_encode,
+                "labels": labels
             }
             # 促销
             free_item = {
@@ -3495,20 +3813,14 @@ class WebAction:
                         and filter_season not in torrent_filter.get("season"):
                     torrent_filter["season"].append(filter_season)
             else:
-                exist_flag = False
-                # 是否已存在
+                fav, rssid = 0, None
+                # 存在标志
                 if item.TMDBID:
-                    try:
-                        exist_flag = MediaServer().check_item_exists(
-                            mtype=mtype,
-                            title=item.TITLE,
-                            year=item.YEAR,
-                            tmdbid=item.TMDBID,
-                            season=int(filter_season.replace("S", "")) if filter_season else None
-                        )
-                    # One Piece S01-S21 E01-E1028 1999 1080p WEB-DL H.264 -@OPFansMaplesnow
-                    except Exception as e:
-                        print(str(e))
+                    fav, rssid, item_url = self.get_media_exists_info(
+                        mtype=mtype,
+                        title=item.TITLE,
+                        year=item.YEAR,
+                        mediaid=item.TMDBID)
 
                 SearchResults[title_string] = {
                     "key": item.ID,
@@ -3522,7 +3834,8 @@ class WebAction:
                     "backdrop": item.IMAGE,
                     "poster": item.POSTER,
                     "overview": item.OVERVIEW,
-                    "exist": exist_flag,
+                    "fav": fav,
+                    "rssid": rssid,
                     "torrent_dict": {
                         SE_key: {
                             group_key: {
@@ -3561,7 +3874,7 @@ class WebAction:
                                           reverse=True)
         return {"code": 0, "total": total, "result": SearchResults}
 
-    @staticmethod
+    @ staticmethod
     def search_media_infos(data):
         """
         根据关键字搜索相似词条
@@ -3575,14 +3888,14 @@ class WebAction:
 
         return {"code": 0, "result": [media.to_dict() for media in medias]}
 
-    @staticmethod
+    @ staticmethod
     def get_movie_rss_list(data=None):
         """
         查询所有电影订阅
         """
         return {"code": 0, "result": Subscribe().get_subscribe_movies()}
 
-    @staticmethod
+    @ staticmethod
     def get_tv_rss_list(data=None):
         """
         查询所有电视剧订阅
@@ -3596,39 +3909,97 @@ class WebAction:
         mtype = data.get("type")
         return {"code": 0, "result": [rec.as_dict() for rec in self.dbhelper.get_rss_history(rtype=mtype)]}
 
-    @staticmethod
-    def get_downloading(data=None):
+    def get_torrents(self, data=None, type='downloading'):
         """
         查询正在下载的任务
         """
-        torrents = Downloader().get_downloading_progress()
+        torrents = []
+        if type == 'downloading':
+            torrents = Downloader().get_downloading_progress()
+        elif type == 'completed':
+            torrents = Downloader().get_completed_progress()
         MediaHander = Media()
+        group = {}
+        history = self.dbhelper.get_download_history(hash=list(map(lambda x: x.get("id"), torrents)))
+        history = {x.DOWNLOAD_ID: x for x in history}
         for torrent in torrents:
-            # 识别
+            poster_path = ''
             name = torrent.get("name")
-            media_info = MediaHander.get_media_info(title=name)
-            if not media_info:
-                torrent.update({
-                    "title": name,
-                    "image": ""
-                })
-                continue
-            if not media_info.tmdb_info:
-                year = media_info.year
-                if year:
-                    title = "%s (%s) %s" % (media_info.get_name(),
-                                            year, media_info.get_season_episode_string())
+            h = history.get(torrent.get("id"))
+            if h:
+                if h.YEAR:
+                    name = "%s (%s)" % (h.TITLE, h.YEAR)
                 else:
-                    title = "%s %s" % (media_info.get_name(),
-                                       media_info.get_season_episode_string())
+                    name = h.TITLE
+                poster_path = h.POSTER
             else:
-                title = "%s %s" % (media_info.get_title_string(
-                ), media_info.get_season_episode_string())
-            poster_path = media_info.get_poster_image()
+                media_info = MediaHander.get_media_info(title=name)
+                if not media_info:
+                    continue
+                if not media_info.tmdb_info:
+                    year = media_info.year
+                    if year:
+                        name = "%s (%s)" % (media_info.get_name(), year)
+                    else:
+                        name = "%s" % (media_info.get_name())
+                else:
+                    name = "%s" % (media_info.get_title_string())
+                poster_path = media_info.get_poster_image()
+            item = group.get(name, {})
+            item['image'] = poster_path
+            added_on = item.get('added_on')
+            item['added_on'] = torrent.get('added_on') if (added_on and added_on < torrent.get('added_on')) or not added_on else added_on
+            item.setdefault('torrents', []).append(torrent)
+            group[name] = item
+        group = {k: v for k, v in sorted(group.items(), key=lambda item: item[1]['added_on'], reverse=True)}
+        for name, item in group.items():
+            item['torrents'] = sorted(item['torrents'], key=lambda item: item['added_on'], reverse=True)
+        return {"code": 0, "result": group}
+
+    def get_downloading(self, data=None):
+        """
+        查询正在下载的任务
+        """
+        MediaHander = Media()
+        DownloaderHandler = Downloader()
+        torrents = DownloaderHandler.get_downloading_progress()
+        for torrent in torrents:
+            # 先查询下载记录，没有再识别
+            name = torrent.get("name")
+            download_info = self.dbhelper.get_download_history_by_downloader(
+                downloader=DownloaderHandler.default_downloader_id,
+                download_id=torrent.get("id")
+            )
+            if download_info:
+                name = download_info.TITLE
+                year = download_info.YEAR
+                poster_path = download_info.POSTER
+                se = download_info.SE
+            else:
+                media_info = MediaHander.get_media_info(title=name)
+                if not media_info:
+                    torrent.update({
+                        "title": name,
+                        "image": ""
+                    })
+                    continue
+                year = media_info.year
+                name = media_info.title or media_info.get_name()
+                se = media_info.get_season_episode_string()
+                poster_path = media_info.get_poster_image()
+            # 拼装标题
+            if year:
+                title = "%s (%s) %s" % (name,
+                                        year,
+                                        se)
+            else:
+                title = "%s %s" % (name, se)
+
             torrent.update({
                 "title": title,
                 "image": poster_path or ""
             })
+
         return {"code": 0, "result": torrents}
 
     def get_transfer_history(self, data):
@@ -3768,7 +4139,7 @@ class WebAction:
                           "help": word_info.HELP, })
         groups = [{"id": "-1",
                    "name": "通用",
-                   "link": "",
+                  "link": "",
                    "type": "1",
                    "seasons": "0",
                    "words": words}]
@@ -3838,7 +4209,7 @@ class WebAction:
             Users.append({"id": user.ID, "name": user.NAME, "pris": pris})
         return {"code": 0, "result": Users}
 
-    @staticmethod
+    @ staticmethod
     def get_filterrules(data=None):
         """
         查询所有过滤规则
@@ -3889,7 +4260,7 @@ class WebAction:
         Config().save_config(cfg)
         return {"code": 0}
 
-    @staticmethod
+    @ staticmethod
     def __test_site(data):
         """
         测试站点连通性
@@ -3898,7 +4269,7 @@ class WebAction:
         code = 0 if flag else -1
         return {"code": code, "msg": msg, "time": times}
 
-    @staticmethod
+    @ staticmethod
     def __get_sub_path(data):
         """
         查询下级子目录
@@ -3964,7 +4335,7 @@ class WebAction:
             "data": r
         }
 
-    @staticmethod
+    @ staticmethod
     def __rename_file(data):
         """
         文件重命名
@@ -3990,12 +4361,12 @@ class WebAction:
                 del_flag, del_msg = self.delete_media_file(filedir=os.path.dirname(file),
                                                            filename=os.path.basename(file))
                 if not del_flag:
-                    log.error(f"【Web】{del_msg}")
+                    log.error(del_msg)
                 else:
-                    log.info(f"【Web】{del_msg}")
+                    log.info(del_msg)
         return {"code": 0}
 
-    @staticmethod
+    @ staticmethod
     def __download_subtitle(data):
         """
         从配置的字幕服务下载单个文件的字幕
@@ -4016,6 +4387,17 @@ class WebAction:
             "bluray": False
         })
         return {"code": 0, "msg": "字幕下载任务已提交，正在后台运行。"}
+
+    @staticmethod
+    def __media_path_scrap(data):
+        """
+        刮削媒体文件夹或文件
+        """
+        path = data.get("path")
+        if not path:
+            return {"code": -1, "msg": "请指定刮削路径"}
+        ThreadHelper().start_thread(Scraper().folder_scraper, (path, None, 'force_all'))
+        return {"code": 0, "msg": "刮削任务已提交，正在后台运行。"}
 
     @staticmethod
     def __get_download_setting(data):
@@ -4072,6 +4454,8 @@ class WebAction:
         enabled = data.get("enabled")
         if cid:
             self.dbhelper.delete_message_client(cid=cid)
+        if int(interactive) == 1:
+            self.dbhelper.check_message_client(interactive=0, ctype=ctype)
         self.dbhelper.insert_message_client(name=name,
                                             ctype=ctype,
                                             config=config,
@@ -4115,7 +4499,7 @@ class WebAction:
         else:
             return {"code": 1}
 
-    @staticmethod
+    @ staticmethod
     def __get_message_client(data):
         """
         获取消息设置
@@ -4123,7 +4507,7 @@ class WebAction:
         cid = data.get("cid")
         return {"code": 0, "detail": Message().get_message_client_info(cid=cid)}
 
-    @staticmethod
+    @ staticmethod
     def __test_message_client(data):
         """
         测试消息设置
@@ -4136,14 +4520,14 @@ class WebAction:
         else:
             return {"code": 1}
 
-    @staticmethod
+    @ staticmethod
     def __get_indexers(data=None):
         """
         获取索引器
         """
         return {"code": 0, "indexers": Indexer().get_indexer_dict()}
 
-    @staticmethod
+    @ staticmethod
     def __get_download_dirs(data):
         """
         获取下载目录
@@ -4155,7 +4539,7 @@ class WebAction:
         dirs = Downloader().get_download_dirs(setting=sid)
         return {"code": 0, "paths": dirs}
 
-    @staticmethod
+    @ staticmethod
     def __find_hardlinks(data):
         files = data.get("files")
         file_dir = data.get("dir")
@@ -4179,7 +4563,7 @@ class WebAction:
                 return {"code": 1}
         return {"code": 0, "data": hardlinks}
 
-    @staticmethod
+    @ staticmethod
     def __update_sites_cookie_ua(data):
         """
         更新所有站点的Cookie和UA
@@ -4190,12 +4574,12 @@ class WebAction:
         twostepcode = data.get("two_step_code")
         ocrflag = data.get("ocrflag")
         # 保存设置
-        SystemConfig().set_system_config(key="CookieUserInfo",
-                                         value={
-                                             "username": username,
-                                             "password": password,
-                                             "two_step_code": twostepcode
-                                         })
+        SystemConfig().set(key=SystemConfigKey.CookieUserInfo,
+                           value={
+                               "username": username,
+                               "password": password,
+                               "two_step_code": twostepcode
+                           })
         retcode, messages = SiteCookie().update_sites_cookie_ua(siteid=siteid,
                                                                 username=username,
                                                                 password=password,
@@ -4216,7 +4600,7 @@ class WebAction:
         Sites().init_config()
         return {"code": 0, "messages": "请求发送成功"}
 
-    @staticmethod
+    @ staticmethod
     def __set_site_captcha_code(data):
         """
         设置站点验证码
@@ -4226,7 +4610,7 @@ class WebAction:
         SiteCookie().set_code(code=code, value=value)
         return {"code": 0}
 
-    @staticmethod
+    @ staticmethod
     def __update_torrent_remove_task(data):
         """
         更新自动删种任务
@@ -4238,7 +4622,7 @@ class WebAction:
             TorrentRemover().init_config()
             return {"code": 0}
 
-    @staticmethod
+    @ staticmethod
     def __get_torrent_remove_task(data=None):
         """
         获取自动删种任务
@@ -4249,7 +4633,7 @@ class WebAction:
             tid = None
         return {"code": 0, "detail": TorrentRemover().get_torrent_remove_tasks(taskid=tid)}
 
-    @staticmethod
+    @ staticmethod
     def __delete_torrent_remove_task(data):
         """
         删除自动删种任务
@@ -4262,7 +4646,7 @@ class WebAction:
         else:
             return {"code": 1}
 
-    @staticmethod
+    @ staticmethod
     def __get_remove_torrents(data):
         """
         获取满足自动删种任务的种子
@@ -4273,7 +4657,7 @@ class WebAction:
             return {"code": 1, "msg": "未获取到符合处理条件种子"}
         return {"code": 0, "data": torrents}
 
-    @staticmethod
+    @ staticmethod
     def __auto_remove_torrents(data):
         """
         执行自动删种任务
@@ -4282,7 +4666,7 @@ class WebAction:
         TorrentRemover().auto_remove_torrents(taskids=tid)
         return {"code": 0}
 
-    @staticmethod
+    @ staticmethod
     def __get_site_favicon(data):
         """
         获取站点图标
@@ -4294,8 +4678,27 @@ class WebAction:
         """
         查询豆瓣同步历史
         """
-        results = self.dbhelper.get_douban_history()
+        results = self.dbhelper.get_all_douban_history()
         return {"code": 0, "result": [item.as_dict() for item in results]}
+
+    def get_douban_wish(self, page=1):
+        """
+        查询豆瓣同步历史
+        """
+        ret_infos = []
+        results = self.dbhelper.get_douban_history(page=page)
+        for result in results:
+            ret_infos.append({
+                "id": "DB:%s" % result.ID,
+                "orgid": result.ID,
+                'title': result.NAME,
+                'type': 'MOV' if result.TYPE == MediaType.MOVIE.value else 'TV',
+                'media_type': result.TYPE,
+                'year': result.YEAR,
+                'vote': result.RATING,
+                'image': result.IMAGE,
+            })
+        return ret_infos
 
     def __delete_douban_history(self, data):
         """
@@ -4314,7 +4717,7 @@ class WebAction:
             return {"code": 1, "msg": "未下载种子或未获取到种子明细"}
         return {"code": 0, "data": [item.as_dict() for item in results]}
 
-    @staticmethod
+    @ staticmethod
     def __set_system_config(data):
         """
         设置系统设置（数据库）
@@ -4324,13 +4727,13 @@ class WebAction:
         if not key or not value:
             return {"code": 1}
         try:
-            SystemConfig().set_system_config(key=key, value=value)
+            SystemConfig().set(key=key, value=value)
             return {"code": 0}
         except Exception as e:
             ExceptionUtils.exception_traceback(e)
             return {"code": 1}
 
-    @staticmethod
+    @ staticmethod
     def get_site_user_statistics(data):
         """
         获取站点用户统计信息
@@ -4351,7 +4754,7 @@ class WebAction:
                 item["site_hash"] = StringUtils.md5_hash(item.get("site"))
         return {"code": 0, "data": statistics}
 
-    @staticmethod
+    @ staticmethod
     def send_custom_message(data):
         """
         发送自定义消息
@@ -4362,7 +4765,7 @@ class WebAction:
         Message().send_custom_message(title=title, text=text, image=image)
         return {"code": 0}
 
-    @staticmethod
+    @ staticmethod
     def get_rmt_modes():
         RmtModes = ModuleConf.RMT_MODES_LITE if SystemUtils.is_lite_version(
         ) else ModuleConf.RMT_MODES
@@ -4370,48 +4773,6 @@ class WebAction:
             "value": value,
             "name": name.value
         } for value, name in RmtModes.items()]
-
-    def __cookiecloud_sync(self, data):
-        """
-        CookieCloud数据同步
-        """
-        server = data.get("server")
-        key = data.get("key")
-        password = data.get("password")
-        # 保存设置
-        SystemConfig().set_system_config(key="CookieCloud",
-                                         value={
-                                             "server": server,
-                                             "key": key,
-                                             "password": password
-                                         })
-        # 同步数据
-        contents, retmsg = CookieCloudHelper(server=server,
-                                             key=key,
-                                             password=password).download_data()
-        if not contents:
-            return {"code": 1, "msg": retmsg}
-        success_count = 0
-        for domain, content_list in contents.items():
-            if domain.startswith('.'):
-                domain = domain[1:]
-            cookie_str = ""
-            for content in content_list:
-                cookie_str += content.get("name") + \
-                    "=" + content.get("value") + ";"
-            if not cookie_str:
-                continue
-            site_info = Sites().get_sites(siteurl=domain)
-            if not site_info:
-                continue
-            self.dbhelper.update_site_cookie_ua(tid=site_info.get("id"),
-                                                cookie=cookie_str)
-            success_count += 1
-        if success_count:
-            # 重载站点信息
-            Sites().init_config()
-            return {"code": 0, "msg": f"成功更新 {success_count} 个站点的Cookie数据"}
-        return {"code": 0, "msg": "同步完成，但未更新任何站点的Cookie！"}
 
     def media_detail(self, data):
         """
@@ -4432,10 +4793,10 @@ class WebAction:
                 "msg": "无法查询到TMDB信息"
             }
         # 查询存在及订阅状态
-        fav, rssid = self.get_media_exists_flag(mtype=mtype,
-                                                title=media_info.title,
-                                                year=media_info.year,
-                                                mediaid=media_info.tmdb_id)
+        fav, rssid, item_url = self.get_media_exists_info(mtype=mtype,
+                                                          title=media_info.title,
+                                                          year=media_info.year,
+                                                          mediaid=media_info.tmdb_id)
         MediaHandler = Media()
         MediaServerHandler = MediaServer()
         # 查询季
@@ -4444,12 +4805,12 @@ class WebAction:
         if seasons:
             for season in seasons:
                 season.update({
-                    "state": MediaServerHandler.check_item_exists(
+                    "state": True if MediaServerHandler.check_item_exists(
                         mtype=mtype,
                         title=media_info.title,
                         year=media_info.year,
                         tmdbid=media_info.tmdb_id,
-                        season=season.get("season_number"))
+                        season=season.get("season_number")) else False
                 })
         return {
             "code": 0,
@@ -4470,12 +4831,13 @@ class WebAction:
                 "link": media_info.get_detail_url(),
                 "douban_link": media_info.get_douban_detail_url(),
                 "fav": fav,
+                "item_url": item_url,
                 "rssid": rssid,
                 "seasons": seasons
             }
         }
 
-    @staticmethod
+    @ staticmethod
     def __media_similar(data):
         """
         查询TMDB相似媒体
@@ -4492,7 +4854,7 @@ class WebAction:
             result = Media().get_tv_similar(tmdbid=tmdbid, page=page)
         return {"code": 0, "data": result}
 
-    @staticmethod
+    @ staticmethod
     def __media_recommendations(data):
         """
         查询TMDB同类推荐媒体
@@ -4509,7 +4871,7 @@ class WebAction:
             result = Media().get_tv_recommendations(tmdbid=tmdbid, page=page)
         return {"code": 0, "data": result}
 
-    @staticmethod
+    @ staticmethod
     def __media_person(data):
         """
         根据TMDBID或关键字查询TMDB演员
@@ -4525,7 +4887,7 @@ class WebAction:
             result = Media().search_tmdb_person(name=keyword)
         return {"code": 0, "data": result}
 
-    @staticmethod
+    @ staticmethod
     def __person_medias(data):
         """
         查询演员参演作品
@@ -4542,21 +4904,21 @@ class WebAction:
                                                              mtype=mtype,
                                                              page=page)}
 
-    @staticmethod
+    @ staticmethod
     def __save_user_script(data):
         """
         保存用户自定义脚本
         """
         script = data.get("javascript") or ""
         css = data.get("css") or ""
-        SystemConfig().set_system_config(key="CustomScript",
-                                         value={
-                                             "css": css,
-                                             "javascript": script
-                                         })
+        SystemConfig().set(key=SystemConfigKey.CustomScript,
+                           value={
+                               "css": css,
+                               "javascript": script
+                           })
         return {"code": 0, "msg": "保存成功"}
 
-    @staticmethod
+    @ staticmethod
     def __run_directory_sync(data):
         """
         执行单个目录的目录同步
@@ -4564,7 +4926,7 @@ class WebAction:
         Sync().transfer_all_sync(sid=data.get("sid"))
         return {"code": 0, "msg": "执行成功"}
 
-    @staticmethod
+    @ staticmethod
     def __update_plugin_config(data):
         """
         保存插件配置
@@ -4577,14 +4939,14 @@ class WebAction:
         PluginManager().reload_plugin(plugin_id)
         return {"code": 0, "msg": "保存成功"}
 
-    def get_media_exists_flag(self, mtype, title, year, mediaid):
+    def get_media_exists_info(self, mtype, title, year, mediaid):
         """
         获取媒体存在标记：是否存在、是否订阅
         :param: mtype 媒体类型
         :param: title 媒体标题
         :param: year 媒体年份
         :param: mediaid TMDBID/DB:豆瓣ID/BG:Bangumi的ID
-        :return: 1-已订阅/2-已下载/0-不存在未订阅, RSSID
+        :return: 1-已订阅/2-已下载/0-不存在未订阅, RSSID, 如果已下载,还会有对应的媒体库的播放地址链接
         """
         if str(mediaid).isdigit():
             tmdbid = mediaid
@@ -4602,18 +4964,23 @@ class WebAction:
             else:
                 season = None
             rssid = self.dbhelper.get_rss_tv_id(title=title, year=year, season=season, tmdbid=tmdbid)
+        item_url = None
         if rssid:
             # 已订阅
             fav = "1"
-        elif MediaServer().check_item_exists(mtype=mtype, title=title, year=year, tmdbid=tmdbid):
-            # 已下载
-            fav = "2"
         else:
-            # 未订阅、未下载
-            fav = "0"
-        return fav, rssid
+            # 检查媒体服务器是否存在
+            item_id = MediaServer().check_item_exists(mtype=mtype, title=title, year=year, tmdbid=tmdbid)
+            if item_id:
+                # 已下载
+                fav = "2"
+                item_url = MediaServer().get_play_url(item_id=item_id)
+            else:
+                # 未订阅、未下载
+                fav = "0"
+        return fav, rssid, item_url
 
-    @staticmethod
+    @ staticmethod
     def __get_season_episodes(data=None):
         """
         查询TMDB剧集情况
@@ -4629,49 +4996,63 @@ class WebAction:
         MediaServerHandler = MediaServer()
         for episode in episodes:
             episode.update({
-                "state": MediaServerHandler.check_item_exists(
+                "state": True if MediaServerHandler.check_item_exists(
                     mtype=MediaType.TV,
                     title=title,
                     year=year,
                     tmdbid=tmdbid,
                     season=season,
-                    episode=episode.get("episode_number"))
+                    episode=episode.get("episode_number")) else False
             })
         return {
             "code": 0,
             "episodes": episodes
         }
 
-    @staticmethod
+    @ staticmethod
     def get_user_menus(data=None):
         """
         查询用户菜单
         """
         return {
             "code": 0,
-            "menus": current_user.get_usermenus(),
-            "level": current_user.level
+            "menus": WebAction.user_menu,
+            "level": 100,
         }
 
-    @staticmethod
+    @ staticmethod
     def get_top_menus(data=None):
         """
         查询顶底菜单列表
         """
         return {
             "code": 0,
-            "menus": UserAuth().get_topmenus()
+            "menus": current_user.get_topmenus()
         }
 
-    @staticmethod
-    def __auth_user_level(data):
+    @ staticmethod
+    def auth_user_level(data=None):
         """
         用户认证
         """
-        site = data.get("site")
-        params = data.get("params")
-        state, msg = UserAuth().check_user(site, params)
+        if data:
+            site = data.get("site")
+            params = data.get("params")
+        else:
+            UserSiteAuthParams = SystemConfig().get(SystemConfigKey.UserSiteAuthParams)
+            if UserSiteAuthParams:
+                site = UserSiteAuthParams.get("site")
+                params = UserSiteAuthParams.get("params")
+            else:
+                return {"code": 1, "msg": "参数错误"}
+        state, msg = User().check_user(site, params)
         if state:
+            # 保存认证数据
+            SystemConfig().set(key=SystemConfigKey.UserSiteAuthParams,
+                               value={
+                                   "site": site,
+                                   "params": params
+                               })
             return {"code": 0, "msg": "认证成功"}
         return {"code": 1, "msg": f"{msg or '认证失败，请检查合作站点账号是否正常！'}"}
 
@@ -4685,6 +5066,7 @@ class WebAction:
         enabled = data.get("enabled")
         transfer = data.get("transfer")
         only_nastool = data.get("only_nastool")
+        match_path = data.get("match_path")
         rmt_mode = data.get("rmt_mode")
         config = data.get("config")
         if not isinstance(config, str):
@@ -4698,6 +5080,7 @@ class WebAction:
                                         enabled=enabled,
                                         transfer=transfer,
                                         only_nastool=only_nastool,
+                                        match_path=match_path,
                                         rmt_mode=rmt_mode,
                                         config=config,
                                         download_dir=download_dir)
@@ -4722,21 +5105,24 @@ class WebAction:
             return {"code": 1}
         checked = data.get("checked")
         flag = data.get("flag")
-        enabled, transfer, only_nastool = None, None, None
+        enabled, transfer, only_nastool, match_path = None, None, None, None
         if flag == "enabled":
             enabled = 1 if checked else 0
         elif flag == "transfer":
             transfer = 1 if checked else 0
         elif flag == "only_nastool":
             only_nastool = 1 if checked else 0
+        elif flag == "match_path":
+            match_path = 1 if checked else 0
         self.dbhelper.check_downloader(did=did,
                                        enabled=enabled,
                                        transfer=transfer,
-                                       only_nastool=only_nastool)
+                                       only_nastool=only_nastool,
+                                       match_path=match_path)
         Downloader().init_config()
         return {"code": 0}
 
-    @staticmethod
+    @ staticmethod
     def __get_downloaders(data):
         """
         获取下载器
@@ -4744,7 +5130,7 @@ class WebAction:
         did = data.get("did")
         return {"code": 0, "detail": Downloader().get_downloader_conf(did=did)}
 
-    @staticmethod
+    @ staticmethod
     def __test_downloader(data):
         """
         测试下载器
@@ -4756,3 +5142,217 @@ class WebAction:
             return {"code": 0}
         else:
             return {"code": 1}
+
+    def __get_indexer_statistics(self, data=None):
+        """
+        获取索引器统计数据
+        """
+        dataset = [["indexer", "avg"]]
+        result = self.dbhelper.get_indexer_statistics() or []
+        dataset.extend([[ret[0], round(ret[4], 1)] for ret in result])
+        return {
+            "code": 0,
+            "data": [{
+                "name": ret[0],
+                "total": ret[1],
+                "fail": ret[2],
+                "success": ret[3],
+                "avg": round(ret[4], 1),
+            } for ret in result],
+            "dataset": dataset
+        }
+
+    @staticmethod
+    def user_statistics():
+        """
+        强制刷新站点数据,并发送站点统计的消息
+        """
+        # 强制刷新站点数据,并发送站点统计的消息
+        SiteUserInfo().refresh_site_data_now()
+
+    @staticmethod
+    def get_default_rss_setting(data):
+        """
+        获取默认订阅设置
+        """
+        match data.get("mtype"):
+            case "TV":
+                default_rss_setting = Subscribe().default_rss_setting_tv
+            case "MOV":
+                default_rss_setting = Subscribe().default_rss_setting_mov
+            case _:
+                default_rss_setting = {}
+        if default_rss_setting:
+            return {"code": 0, "data": default_rss_setting}
+        return {"code": 1}
+
+    @staticmethod
+    def get_movie_rss_items(data=None):
+        """
+        获取所有电影订阅项目
+        """
+        RssMovieItems = [
+            {
+                "id": movie.get("tmdbid"),
+                "rssid": movie.get("id")
+            } for movie in Subscribe().get_subscribe_movies().values() if movie.get("tmdbid")
+        ]
+        return {"code": 0, "result": RssMovieItems}
+
+    @staticmethod
+    def get_tv_rss_items(data=None):
+        """
+        获取所有电视剧订阅项目
+        """
+        # 电视剧订阅
+        RssTvItems = [
+            {
+                "id": tv.get("tmdbid"),
+                "rssid": tv.get("id"),
+                "season": int(str(tv.get('season')).replace("S", "")),
+                "name": tv.get("name"),
+            } for tv in Subscribe().get_subscribe_tvs().values() if tv.get('season') and tv.get("tmdbid")
+        ]
+        # 自定义订阅
+        RssTvItems += RssChecker().get_userrss_mediainfos()
+        # 电视剧订阅去重
+        Uniques = set()
+        UniqueTvItems = []
+        for item in RssTvItems:
+            unique = f"{item.get('id')}_{item.get('season')}"
+            if unique not in Uniques:
+                Uniques.add(unique)
+                UniqueTvItems.append(item)
+        return {"code": 0, "result": UniqueTvItems}
+
+    def get_ical_events(self, data=None):
+        """
+        获取ical日历事件
+        """
+        Events = []
+        # 电影订阅
+        RssMovieItems = self.get_movie_rss_items().get("result")
+        for movie in RssMovieItems:
+            info = self.__movie_calendar_data(movie)
+            if info.get("id"):
+                Events.append(info)
+
+        # 电视剧订阅
+        RssTvItems = self.get_tv_rss_items().get("result")
+        for tv in RssTvItems:
+            infos = self.__tv_calendar_data(tv).get("events")
+            if infos and isinstance(infos, list):
+                for info in infos:
+                    if info.get("id"):
+                        Events.append(info)
+
+        return {"code": 0, "result": Events}
+
+    @staticmethod
+    def install_plugin(data):
+        """
+        安装插件
+        """
+        module_id = data.get("id")
+        if not module_id:
+            return {"code": -1, "msg": "参数错误"}
+        # 用户已安装插件列表
+        user_plugins = SystemConfig().get(SystemConfigKey.UserInstalledPlugins) or []
+        if module_id not in user_plugins:
+            user_plugins.append(module_id)
+        # 保存配置
+        SystemConfig().set(SystemConfigKey.UserInstalledPlugins, user_plugins)
+        # 重新加载插件
+        PluginManager().init_config()
+        return {"code": 0, "msg": "插件安装成功"}
+
+    @staticmethod
+    def uninstall_plugin(data):
+        """
+        卸载插件
+        """
+        module_id = data.get("id")
+        if not module_id:
+            return {"code": -1, "msg": "参数错误"}
+        # 用户已安装插件列表
+        user_plugins = SystemConfig().get(SystemConfigKey.UserInstalledPlugins) or []
+        if module_id in user_plugins:
+            user_plugins.remove(module_id)
+        # 保存配置
+        SystemConfig().set(SystemConfigKey.UserInstalledPlugins, user_plugins)
+        # 重新加载插件
+        PluginManager().init_config()
+        return {"code": 0, "msg": "插件卸载功"}
+
+    @staticmethod
+    def get_plugin_apps(data=None):
+        """
+        获取插件列表
+        """
+        return {"code": 0, "result": PluginManager().get_plugin_apps(current_user.level)}
+
+    @staticmethod
+    def get_plugin_page(data):
+        """
+        查询插件的额外数据
+        """
+        plugin_id = data.get("id")
+        if not plugin_id:
+            return {"code": 1, "msg": "参数错误"}
+        title, content = PluginManager().get_plugin_page(pid=plugin_id)
+        return {"code": 0, "title": title, "content": content}
+
+    @staticmethod
+    def get_plugin_state(data):
+        """
+        获取插件状态
+        """
+        plugin_id = data.get("id")
+        if not plugin_id:
+            return {"code": 1, "msg": "参数错误"}
+        state = PluginManager().get_plugin_state(plugin_id)
+        return {"code": 0, "state": state}
+
+    @staticmethod
+    def get_plugins_conf(data=None):
+        Plugins = PluginManager().get_plugins_conf(current_user.level)
+        return {"code": 0, "result": Plugins}
+
+    @staticmethod
+    def douban_sync(data=None):
+        """
+        启动豆瓣同步
+        """
+        # 触发事件
+        EventManager().send_event(EventType.DoubanSync, {})
+
+    @staticmethod
+    def update_category_config(data):
+        """
+        保存二级分类配置
+        """
+        text = data.get("config") or ''
+        # 保存配置
+        category_path = Config().category_path
+        if category_path:
+            with open(category_path, "w", encoding="utf-8") as f:
+                f.write(text)
+        return {"code": 0, "msg": "保存成功"}
+
+    @staticmethod
+    def get_category_config(data):
+        """
+        获取二级分类配置
+        """
+        category_name = data.get("category_name")
+        if not category_name:
+            return {"code": 1, "msg": "请输入二级分类策略名称"}
+        if category_name == "config":
+            return {"code": 1, "msg": "非法二级分类策略名称"}
+        category_path = os.path.join(Config().get_config_path(), f"{category_name}.yaml")
+        if not os.path.exists(category_path):
+            return {"code": 1, "msg": "请保存生成配置文件"}
+        # 读取category配置文件数据
+        with open(category_path, "r", encoding="utf-8") as f:
+            category_text = f.read()
+        return {"code": 0, "text": category_text}

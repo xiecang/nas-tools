@@ -6,24 +6,21 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # 运行环境判断
-is_windows_exe = getattr(sys, 'frozen', False) and (os.name == "nt")
+is_executable = getattr(sys, 'frozen', False)
+is_windows_exe = is_executable and (os.name == "nt")
 if is_windows_exe:
     # 托盘相关库
     import threading
-    from windows.trayicon import TrayIcon, NullWriter
+    from package.trayicon import TrayIcon, NullWriter
 
-    # 初始化环境变量
-    os.environ["NASTOOL_CONFIG"] = os.path.join(os.path.dirname(sys.executable),
-                                                "config",
-                                                "config.yaml").replace("\\", "/")
-    os.environ["NASTOOL_LOG"] = os.path.join(os.path.dirname(sys.executable),
-                                             "config",
-                                             "logs").replace("\\", "/")
+if is_executable:
+    # 可执行文件初始化环境变量
+    config_path = os.path.join(os.path.dirname(sys.executable), "config").replace("\\", "/")
+    os.environ["NASTOOL_CONFIG"] = os.path.join(config_path, "config.yaml").replace("\\", "/")
+    os.environ["NASTOOL_LOG"] = os.path.join(config_path, "logs").replace("\\", "/")
     try:
-        config_dir = os.path.join(os.path.dirname(sys.executable),
-                                  "config").replace("\\", "/")
-        if not os.path.exists(config_dir):
-            os.makedirs(config_dir)
+        if not os.path.exists(config_path):
+            os.makedirs(config_path)
     except Exception as err:
         print(str(err))
 
@@ -33,7 +30,7 @@ from web.action import WebAction
 from web.main import App
 from app.db import init_db, update_db, init_data
 from app.helper import init_chrome
-from check_config import update_config, check_config,  start_config_monitor, stop_config_monitor
+from initializer import update_config, check_config,  start_config_monitor, stop_config_monitor
 from version import APP_VERSION
 
 
@@ -59,6 +56,7 @@ def get_run_config(forcev4=False):
     _ssl_cert = None
     _ssl_key = None
     _debug = False
+    _use_reloader = False
 
     app_conf = Config().get_config('app')
     if app_conf:
@@ -71,6 +69,7 @@ def get_run_config(forcev4=False):
         _ssl_key = app_conf.get('ssl_key')
         _ssl_key = app_conf.get('ssl_key')
         _debug = True if app_conf.get("debug") else False
+        _use_reloader = True if _debug else False
 
     app_arg = dict(host=_web_host, port=_web_port, debug=_debug, threaded=True, use_reloader=False)
     if _ssl_cert:
@@ -102,6 +101,8 @@ def start_service():
     log.console("开始启动服务...")
     # 启动服务
     WebAction.start_service()
+    # 用户认证
+    WebAction.auth_user_level()
     # 监听配置文件变化
     start_config_monitor()
 
@@ -125,17 +126,15 @@ if __name__ == '__main__':
         sys.stdout = NullWriter()
         sys.stderr = NullWriter()
 
-
         def traystart():
             TrayIcon(homepage, log_path)
-
 
         if len(os.popen("tasklist| findstr %s" % os.path.basename(sys.executable), 'r').read().splitlines()) <= 2:
             p1 = threading.Thread(target=traystart, daemon=True)
             p1.start()
-    else:
-        # 初始化浏览器驱动
-        init_chrome()
+
+    # 初始化浏览器驱动
+    init_chrome()
 
     # gunicorn 启动
     App.run(**get_run_config(is_windows_exe))

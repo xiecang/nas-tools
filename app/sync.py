@@ -8,12 +8,12 @@ from watchdog.observers.polling import PollingObserver
 
 import log
 from app.conf import ModuleConf
-from app.helper import DbHelper
-from config import RMT_MEDIAEXT, Config
 from app.filetransfer import FileTransfer
-from app.utils.commons import singleton
+from app.helper import DbHelper
 from app.utils import PathUtils, ExceptionUtils
+from app.utils.commons import singleton
 from app.utils.types import SyncType, OsType
+from config import RMT_MEDIAEXT, Config
 
 lock = threading.Lock()
 
@@ -32,7 +32,11 @@ class FileMonitorHandler(FileSystemEventHandler):
         self.sync.file_change_handler(event, "创建", event.src_path)
 
     def on_moved(self, event):
-        self.sync.file_change_handler(event, "移动", event.dest_path)
+        self.sync.file_change_handler(event, "移入", event.dest_path)
+        self.sync.file_delete_handler(event, "移出", event.src_path)
+
+    def on_deleted(self, event):
+        self.sync.file_delete_handler(event, '删除', event.src_path)
 
     """
     def on_modified(self, event):
@@ -126,6 +130,34 @@ class Sync(object):
             return []
         return [os.path.normpath(key) for key in self.sync_dir_config.keys()]
 
+    def file_delete_handler(self, event, text, event_path):
+        if not os.path.exists(event_path):
+            pass
+        log.debug("【Sync】文件%s：%s" % (text, event_path))
+        # 不是监控目录下的文件不处理
+        is_monitor_file = False
+        for tpath in self.sync_dir_config.keys():
+            if PathUtils.is_path_in_path(tpath, event_path):
+                is_monitor_file = True
+                break
+        if not is_monitor_file:
+            return
+        # 目的目录的子文件不处理
+        for tpath in self.sync_dir_config.values():
+            if not tpath:
+                continue
+            if PathUtils.is_path_in_path(tpath.get('target'), event_path):
+                return
+            if PathUtils.is_path_in_path(tpath.get('unknown'), event_path):
+                return
+        # 媒体库目录及子目录不处理
+        if self.filetransfer.is_target_dir_path(event_path):
+            return
+        # 回收站及隐藏的文件不处理
+        if PathUtils.is_invalid_path(event_path):
+            return
+        self.filetransfer.delete_dest_media(event_path)
+
     def file_change_handler(self, event, text, event_path):
         """
         处理文件变化
@@ -133,6 +165,7 @@ class Sync(object):
         :param text: 事件描述
         :param event_path: 事件文件路径
         """
+        log.debug("【Sync】文件%s：%s" % (text, event_path))
         if not event.is_directory:
             # 文件发生变化
             try:
@@ -158,20 +191,25 @@ class Sync(object):
                         is_monitor_file = True
                         break
                 if not is_monitor_file:
+                    log.debug(f"【Sync】{event_path} 不在监控目录下，不处理 ...")
                     return
                 # 目的目录的子文件不处理
                 for tpath in self.sync_dir_config.values():
                     if not tpath:
                         continue
                     if PathUtils.is_path_in_path(tpath.get('target'), event_path):
+                        log.error(f"【Sync】{event_path} -> {tpath.get('target')} 目的目录存在嵌套，无法同步！")
                         return
                     if PathUtils.is_path_in_path(tpath.get('unknown'), event_path):
+                        log.error(f"【Sync】{event_path} -> {tpath.get('unknown')} 未识别目录存在嵌套，无法同步！")
                         return
                 # 媒体库目录及子目录不处理
                 if self.filetransfer.is_target_dir_path(event_path):
+                    log.error(f"【Sync】{event_path} 是媒体库子目录，无法同步！")
                     return
                 # 回收站及隐藏的文件不处理
                 if PathUtils.is_invalid_path(event_path):
+                    log.debug(f"【Sync】{event_path} 是回收站或隐藏的文件，不处理 ...")
                     return
                 # 上级目录
                 from_dir = os.path.dirname(event_path)

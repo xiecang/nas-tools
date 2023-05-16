@@ -1,3 +1,5 @@
+import log
+import traceback
 from concurrent.futures import ThreadPoolExecutor
 
 from app.utils.commons import singleton
@@ -14,5 +16,13 @@ class ThreadHelper:
     def init_config(self):
         pass
 
+    def thread_pool_callback(self, worker):
+        e = worker.exception()
+        if e is None:
+            return
+        tb = e.__traceback__
+        log.debug(f"【Exception】线程执行异常，错误: {str(e)}" + "".join(traceback.format_tb(tb)))
+
     def start_thread(self, func, kwargs):
-        self.executor.submit(func, *kwargs)
+        thread_pool_exc = self.executor.submit(func, *kwargs)
+        thread_pool_exc.add_done_callback(self.thread_pool_callback)
