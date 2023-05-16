@@ -4,7 +4,7 @@ Forked from [NAStool/nas-tools](https://github.com/NAStool/nas-tools)
 
 项目详情以及使用方式请移步原项目。
 
-Docker：[链接](https://hub.docker.com/repository/docker/n120318/nas-tools)
+Docker：[链接](https://hub.docker.com/r/n120318/nas-tools)
 
 ## 背景
 
