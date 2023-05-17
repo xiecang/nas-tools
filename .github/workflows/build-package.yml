@@ -261,23 +261,23 @@ jobs:
           pwd
           ls -all
 
-    - name: Create release
-      id: create_release
-      uses: actions/create-release@latest
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: v${{ env.app_version }}
-        release_name: v${{ env.app_version }}
-        body: ${{ github.event.commits[0].message }}
-        draft: false
-        prerelease: false
+      - name: Create release
+        id: create_release
+        uses: actions/create-release@latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ env.app_version }}
+          release_name: v${{ env.app_version }}
+          body: ${{ github.event.commits[0].message }}
+          draft: false
+          prerelease: false
 
-    - name: Upload release asset
-      uses: dwenegar/upload-release-assets@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        release_id: ${{ steps.create_release.outputs.id }}
-        assets_path: |
+      - name: Upload release asset
+        uses: dwenegar/upload-release-assets@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          release_id: ${{ steps.create_release.outputs.id }}
+          assets_path: |
             /home/runner/work/nas-tools/nas-tools/releases/
