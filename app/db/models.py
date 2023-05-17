@@ -63,6 +63,7 @@ class CONFIGSYNCPATHS(Base):
     DEST = Column(Text)
     UNKNOWN = Column(Text)
     MODE = Column(Text)
+    COMPATIBILITY = Column(Integer)
     RENAME = Column(Integer)
     ENABLED = Column(Integer)
     NOTE = Column(Text)
@@ -132,26 +133,6 @@ class CUSTOMWORDGROUPS(Base):
     NOTE = Column(Text)
 
 
-class DOUBANMEDIAS(Base):
-    __tablename__ = 'DOUBAN_MEDIAS'
-    __table_args__ = (
-        Index('INDX_DOUBAN_MEDIAS_NAME', 'NAME', 'YEAR'),
-    )
-
-    ID = Column(Integer, Sequence('ID'), primary_key=True)
-    NAME = Column(Text)
-    YEAR = Column(Text)
-    TYPE = Column(Text)
-    RATING = Column(Text)
-    IMAGE = Column(Text)
-    STATE = Column(Text)
-    ADD_TIME = Column(Text)
-    MARK_DATE = Column(Text)
-
-    def as_dict(self):
-        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
-
-
 class DOWNLOADER(Base):
     __tablename__ = 'DOWNLOADER'
 
@@ -199,7 +180,6 @@ class DOWNLOADSETTING(Base):
     NAME = Column(Text)
     CATEGORY = Column(Text)
     TAGS = Column(Text)
-    CONTENT_LAYOUT = Column(Integer)
     IS_PAUSED = Column(Integer)
     UPLOAD_LIMIT = Column(Integer)
     DOWNLOAD_LIMIT = Column(Integer)
@@ -412,7 +392,7 @@ class SITEBRUSHTORRENTS(Base):
     TASK_ID = Column(Text, index=True)
     TORRENT_NAME = Column(Text)
     TORRENT_SIZE = Column(Text)
-    ENCLOSURE = Column(Text)
+    ENCLOSURE = Column(Text, index=True)
     DOWNLOADER = Column(Text)
     DOWNLOAD_ID = Column(Text)
     LST_MOD_DATE = Column(Text)

@@ -162,6 +162,20 @@ class UserList(ClientResource):
         return WebAction().api_action(cmd='get_users')
 
 
+@user.route('/auth')
+class UserAuth(ClientResource):
+    parser = reqparse.RequestParser()
+    parser.add_argument('site', type=str, help='合作站点', location='form', required=True)
+    parser.add_argument('params', type=str, help='认证参数', location='form', required=True)
+
+    @user.doc(parser=parser)
+    def post(self):
+        """
+        用户认证
+        """
+        return WebAction().api_action(cmd='auth_user_level', data=self.parser.parse_args())
+
+
 @service.route('/mediainfo')
 class ServiceMediaInfo(ApiResource):
     parser = reqparse.RequestParser()
@@ -220,7 +234,7 @@ class ServiceNetworkTest(ClientResource):
 class ServiceRun(ClientResource):
     parser = reqparse.RequestParser()
     parser.add_argument('item', type=str,
-                        help='服务名称（autoremovetorrents、pttransfer、ptsignin、sync、rssdownload、subscribe_search_all）',
+                        help='服务名称（pttransfer、sync、rssdownload、subscribe_search_all）',
                         location='form',
                         required=True)
 
@@ -425,7 +439,6 @@ class SiteList(ClientResource):
     parser.add_argument('basic', type=int, help='只查询基本信息（0-否/1-是）', location='form')
     parser.add_argument('rss', type=int, help='订阅（0-否/1-是）', location='form')
     parser.add_argument('brush', type=int, help='刷流（0-否/1-是）', location='form')
-    parser.add_argument('signin', type=int, help='签到（0-否/1-是）', location='form')
     parser.add_argument('statistic', type=int, help='数据统计（0-否/1-是）', location='form')
 
     def post(self):
@@ -605,8 +618,6 @@ class DownloadConfigUpdate(ClientResource):
     parser.add_argument('name', type=str, help='名称', location='form', required=True)
     parser.add_argument('category', type=str, help='分类', location='form')
     parser.add_argument('tags', type=str, help='标签', location='form')
-    parser.add_argument('content_layout', type=int, help='布局（0-全局/1-原始/2-创建子文件夹/3-不建子文件夹）',
-                        location='form')
     parser.add_argument('is_paused', type=int, help='动作（0-添加后开始/1-添加后暂停）', location='form')
     parser.add_argument('upload_limit', type=int, help='上传速度限制', location='form')
     parser.add_argument('download_limit', type=int, help='下载速度限制', location='form')
@@ -924,19 +935,6 @@ class LibrarySpace(ClientResource):
         return WebAction().api_action(cmd='get_library_spacesize')
 
 
-@system.route('/logging')
-class SystemLogging(ClientResource):
-    parser = reqparse.RequestParser()
-    parser.add_argument('refresh_new', type=int, help='是否刷新增量日志（0-否/1-是）', location='form', required=True)
-
-    @system.doc(parser=parser)
-    def post(self):
-        """
-        获取实时日志
-        """
-        return WebAction().api_action(cmd='logging', data=self.parser.parse_args())
-
-
 @system.route('/version')
 class SystemVersion(ClientResource):
 
@@ -952,7 +950,9 @@ class SystemVersion(ClientResource):
 class SystemPath(ClientResource):
     parser = reqparse.RequestParser()
     parser.add_argument('dir', type=str, help='路径', location='form', required=True)
-    parser.add_argument('filter', type=str, help='过滤器（ONLYFILE/ONLYDIR/MEDIAFILE/SUBFILE/ALL）', location='form',
+    parser.add_argument('filter', type=str,
+                        help='过滤器（ONLYFILE/ONLYDIR/MEDIAFILE/SUBFILE/AUDIOTRACKFILE/ALL）',
+                        location='form',
                         required=True)
 
     @system.doc(parser=parser)
@@ -1002,23 +1002,10 @@ class SystemUpdate(ClientResource):
         }
 
 
-@system.route('/message')
-class SystemMessage(ClientResource):
-    parser = reqparse.RequestParser()
-    parser.add_argument('lst_time', type=str, help='时间（YYYY-MM-DD HH24:MI:SS）', location='form')
-
-    @system.doc(parser=parser)
-    def post(self):
-        """
-        查询消息中心消息
-        """
-        return WebAction().get_system_message(lst_time=self.parser.parse_args().get("lst_time"))
-
-
 @system.route('/progress')
 class SystemProgress(ClientResource):
     parser = reqparse.RequestParser()
-    parser.add_argument('type', type=str, help='类型（search/mediasync）', location='form', required=True)
+    parser.add_argument('type', type=str, help='类型（ProgressKey）', location='form', required=True)
 
     @system.doc(parser=parser)
     def post(self):
@@ -1072,7 +1059,7 @@ class ConfigInfo(ClientResource):
     @staticmethod
     def post():
         """
-        获取所有配置信息
+        获取所有配置文件信息
         """
         return {
             "code": 0,
@@ -1094,6 +1081,20 @@ class ConfigDirectory(ClientResource):
         配置媒体库目录
         """
         return WebAction().api_action(cmd='update_directory', data=self.parser.parse_args())
+
+
+@config.route('/set')
+class ConfigSet(ClientResource):
+    parser = reqparse.RequestParser()
+    parser.add_argument('key', type=str, help='配置项', location='form', required=True)
+    parser.add_argument('value', type=str, help='配置值', location='form', required=True)
+
+    @config.doc(parser=parser)
+    def post(self):
+        """
+        保存系统配置值
+        """
+        return WebAction().api_action(cmd='set_system_config', data=self.parser.parse_args())
 
 
 @subscribe.route('/delete')
@@ -1274,9 +1275,8 @@ class SubscribeTvList(ClientResource):
 @recommend.route('/list')
 class RecommendList(ClientResource):
     parser = reqparse.RequestParser()
-    parser.add_argument('type', type=str,
-                        help='类型（hm/ht/nm/nt/dbom/dbhm/dbht/dbdh/dbnm/dbtop/dbzy/bangumi）',
-                        location='form', required=True)
+    parser.add_argument('type', type=str, help='类型', location='form', required=True)
+    parser.add_argument('subtype', type=str, help='子类型', location='form', required=True)
     parser.add_argument('page', type=int, help='页码', location='form', required=True)
 
     @recommend.doc(parser=parser)
@@ -1656,6 +1656,9 @@ class BrushTaskUpdate(ClientResource):
     parser.add_argument('brushtask_interval', type=int, help='刷新间隔(分钟)', location='form', required=True)
     parser.add_argument('brushtask_downloader', type=int, help='下载器', location='form', required=True)
     parser.add_argument('brushtask_totalsize', type=int, help='保种体积(GB)', location='form', required=True)
+    parser.add_argument('brushtask_savepath', type=str, help='保存目录', location='form')
+    parser.add_argument('brushtask_label', type=str, help='标签', location='form')
+    parser.add_argument('brushtask_rssurl', type=str, help='RSS地址', location='form')
     parser.add_argument('brushtask_state', type=str, help='状态（Y/N）', location='form', required=True)
     parser.add_argument('brushtask_transfer', type=str, help='转移到媒体库（Y/N）', location='form')
     parser.add_argument('brushtask_sendmessage', type=str, help='消息推送（Y/N）', location='form')
@@ -2041,6 +2044,7 @@ class SyncDirectoryUpdate(ClientResource):
     parser.add_argument('to', type=str, help='目的目录', location='form')
     parser.add_argument('unknown', type=str, help='未知目录', location='form')
     parser.add_argument('syncmod', type=str, help='同步模式', location='form')
+    parser.add_argument('compatibility', type=str, help='兼容模式', location='form')
     parser.add_argument('rename', type=str, help='重命名', location='form')
     parser.add_argument('enabled', type=str, help='开启', location='form')
 
@@ -2100,7 +2104,7 @@ class SyncDirectoryList(ClientResource):
         """
         查询所有同步目录
         """
-        return WebAction().api_action(cmd='get_directorysync')
+        return WebAction().api_action(cmd='get_sync_path')
 
 
 @sync.route('/directory/run')

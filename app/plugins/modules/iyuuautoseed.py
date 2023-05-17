@@ -6,13 +6,13 @@ from threading import Event
 import pytz
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from jinja2 import Template
 from lxml import etree
 
 from app.downloader import Downloader
-from app.helper import IyuuHelper
 from app.media.meta import MetaInfo
-from app.message import Message
 from app.plugins.modules._base import _IPluginModule
+from app.plugins.modules.iyuu.iyuu_helper import IyuuHelper
 from app.sites import Sites
 from app.utils import RequestUtils
 from app.utils.types import DownloaderType
@@ -46,7 +46,6 @@ class IYUUAutoSeed(_IPluginModule):
     downloader = None
     iyuuhelper = None
     sites = None
-    message = None
     # 限速开关
     _enable = False
     _cron = None
@@ -108,7 +107,7 @@ class IYUUAutoSeed(_IPluginModule):
                         {
                             'title': 'IYUU Token',
                             'required': "required",
-                            'tooltip': '登录IYUU使用的Token，用于调用IYUU官方Api',
+                            'tooltip': '登录IYUU使用的Token，用于调用IYUU官方Api；需要完成IYUU认证，填写token并保存后，可通过左下角按钮完成认证（已通过IYUU其它渠道认证过的无需再认证）',
                             'type': 'text',
                             'content': [
                                 {
@@ -184,7 +183,7 @@ class IYUUAutoSeed(_IPluginModule):
                         {
                             'title': '运行时通知',
                             'required': "",
-                            'tooltip': '运行辅助任务后会发送通知（需要打开自定义消息通知）',
+                            'tooltip': '运行辅助任务后会发送通知（需要打开插件消息通知）',
                             'type': 'switch',
                             'id': 'notify',
                         },
@@ -210,7 +209,6 @@ class IYUUAutoSeed(_IPluginModule):
     def init_config(self, config=None):
         self.downloader = Downloader()
         self.sites = Sites()
-        self.message = Message()
         # 读取配置
         if config:
             self._enable = config.get("enable")
@@ -233,9 +231,12 @@ class IYUUAutoSeed(_IPluginModule):
             self.iyuuhelper = IyuuHelper(token=self._token)
             self._scheduler = BackgroundScheduler(timezone=Config().get_timezone())
             if self._cron:
-                self.info(f"辅种服务启动，周期：{self._cron}")
-                self._scheduler.add_job(self.auto_seed,
-                                        CronTrigger.from_crontab(self._cron))
+                try:
+                    self._scheduler.add_job(self.auto_seed,
+                                            CronTrigger.from_crontab(self._cron))
+                    self.info(f"辅种服务启动，周期：{self._cron}")
+                except Exception as err:
+                    self.error(f"运行周期格式不正确：{str(err)}")
             if self._onlyonce:
                 self.info(f"辅种服务启动，立即运行一次")
                 self._scheduler.add_job(self.auto_seed, 'date',
@@ -259,6 +260,98 @@ class IYUUAutoSeed(_IPluginModule):
 
     def get_state(self):
         return True if self._enable and self._cron and self._token and self._downloaders else False
+
+    def get_page(self):
+        """
+        IYUU认证页面
+        :return: 标题，页面内容，确定按钮响应函数
+        """
+        if not self._token:
+            return None, None, None
+        if not self.iyuuhelper:
+            self.iyuuhelper = IyuuHelper(token=self._token)
+        auth_sites = self.iyuuhelper.get_auth_sites()
+        template = """
+                  <div class="modal-body">
+                    <div class="row">
+                        <div class="col">
+                            <div class="mb-3">
+                                <label class="form-label required">IYUU合作站点</label>
+                                <select class="form-control" id="iyuuautoseed_site" onchange="">
+                                    {% for Site in AuthSites %}
+                                    <option value="{{ Site.site }}">{{ Site.site }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-lg">
+                            <div class="mb-3">
+                                <label class="form-label required">用户ID</label>
+                                <input class="form-control" autocomplete="off" type="text" id="iyuuautoseed_uid" placeholder="uid">
+                            </div>
+                        </div>
+                        <div class="col-lg">
+                            <div class="mb-3">
+                                <label class="form-label required">PassKey</label>
+                                <input class="form-control" autocomplete="off" type="text" id="iyuuautoseed_passkey" placeholder="passkey">
+                            </div>
+                        </div>
+                    </div>
+                  </div>
+                """
+        return "IYUU站点绑定", Template(template).render(AuthSites=auth_sites,
+                                                         IyuuToken=self._token), "IYUUAutoSeed_user_bind_site()"
+
+    @staticmethod
+    def get_script():
+        """
+        页面JS脚本
+        """
+        return """
+          // IYUU站点认证
+          function IYUUAutoSeed_user_bind_site(){
+            let site = $("#iyuuautoseed_site").val();
+            let uid = $("#iyuuautoseed_uid").val();
+            let passkey = $("#iyuuautoseed_passkey").val();
+            let token = '{{ IyuuToken }}';
+            if (!uid) {
+                $("#iyuuautoseed_uid").addClass("is-invalid");
+                return;
+            } else {
+                $("#iyuuautoseed_uid").removeClass("is-invalid");
+            }
+            if (!passkey) {
+                $("#iyuuautoseed_passkey").addClass("is-invalid");
+                return;
+            } else {
+                $("#iyuuautoseed_passkey").removeClass("is-invalid");
+            }
+            // 认证
+            ajax_post("run_plugin_method", {"plugin_id": 'IYUUAutoSeed', 'method': 'iyuu_bind_site', "site": site, "uid": uid, "passkey": passkey}, function (ret) {
+                $("#modal-plugin-page").modal('hide');
+                if (ret.result.code === 0) {
+                    show_success_modal("IYUU用户认证成功！", function () {
+                        $("#modal-plugin-IYUUAutoSeed").modal('show');
+                    });
+                } else {
+                    show_fail_modal(ret.result.msg, function(){
+                        $("#modal-plugin-page").modal('show');
+                    });
+                }
+            });
+          }
+        """
+
+    def iyuu_bind_site(self, site, passkey, uid):
+        """
+        IYUU绑定合作站点
+        """
+        state, msg = self.iyuuhelper.bind_site(site=site,
+                                               passkey=passkey,
+                                               uid=uid)
+        return {"code": 0 if state else 1, "msg": msg}
 
     def __update_config(self):
         self.update_config({
@@ -349,15 +442,16 @@ class IYUUAutoSeed(_IPluginModule):
         self.__update_config()
         # 发送消息
         if self._notify:
-            self.message.send_custom_message(
-                title="【IYUU自动辅种任务完成】",
-                text=f"服务器返回可辅种总数：{self.total}\n"
-                     f"实际可辅种数：{self.realtotal}\n"
-                     f"已存在：{self.exist}\n"
-                     f"成功：{self.success}\n"
-                     f"失败：{self.fail}\n"
-                     f"{self.cached} 条失败记录已加入缓存"
-            )
+            if self.success or self.fail:
+                self.send_message(
+                    title="【IYUU自动辅种任务完成】",
+                    text=f"服务器返回可辅种总数：{self.total}\n"
+                         f"实际可辅种数：{self.realtotal}\n"
+                         f"已存在：{self.exist}\n"
+                         f"成功：{self.success}\n"
+                         f"失败：{self.fail}\n"
+                         f"{self.cached} 条失败记录已加入缓存"
+                )
         self.info("辅种任务执行完成")
 
     def check_recheck(self):
@@ -563,10 +657,12 @@ class IYUUAutoSeed(_IPluginModule):
             self.fail += 1
             self.cached += 1
             return False
+        # 强制使用Https
+        torrent_url = f"{torrent_url}&https=1"
         meta_info = MetaInfo(title="IYUU自动辅种")
         meta_info.set_torrent_info(site=site_info.get("name"),
                                    enclosure=torrent_url)
-        # 辅种任务默认暂停，关闭自动管理模式
+        # 辅种任务默认暂停
         _, download_id, retmsg = self.downloader.download(
             media_info=meta_info,
             is_paused=True,
@@ -574,7 +670,6 @@ class IYUUAutoSeed(_IPluginModule):
             downloader_id=downloader,
             download_dir=save_path,
             download_setting="-2",
-            is_auto=False
         )
         if not download_id:
             # 下载失败
@@ -703,8 +798,8 @@ class IYUUAutoSeed(_IPluginModule):
                                       flags=re.IGNORECASE)
                 return f"{site.get('strict_url')}/{download_url}"
         except Exception as e:
-            self.warn(f"当前不支持该站点的辅助任务，Url转换失败：{str(e)}")
-            return None
+            self.warn(f"站点 {site.get('name')} Url转换失败：{str(e)}，尝试通过详情页面获取种子下载链接 ...")
+            return self.__get_torrent_url_from_page(seed=seed, site=site)
 
     def __get_torrent_url_from_page(self, seed, site):
         """
@@ -742,6 +837,7 @@ class IYUUAutoSeed(_IPluginModule):
                 self.warn(f"获取种子下载链接失败，未找到下载链接：{page_url}")
                 return None
             else:
+                self.error(f"获取种子下载链接失败，请求失败：{page_url}，{res.status_code if res else ''}")
                 return None
         except Exception as e:
             self.warn(f"获取种子下载链接失败：{str(e)}")

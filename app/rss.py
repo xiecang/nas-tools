@@ -1,25 +1,23 @@
 import re
-import xml.dom.minidom
-import traceback
 from threading import Lock
 
 import log
 from app.downloader import Downloader
 from app.filter import Filter
-from app.helper import DbHelper
+from app.helper import DbHelper, RssHelper
 from app.media import Media
 from app.media.meta import MetaInfo
 from app.sites import Sites, SiteConf
 from app.subscribe import Subscribe
-from app.utils import DomUtils, RequestUtils, StringUtils, ExceptionUtils, RssTitleUtils, Torrent
+from app.utils import ExceptionUtils, Torrent
+from app.utils.commons import singleton
 from app.utils.types import MediaType, SearchType
-from config import Config
 
 lock = Lock()
 
 
+@singleton
 class Rss:
-    _sites = []
     filter = None
     media = None
     sites = None
@@ -27,6 +25,7 @@ class Rss:
     downloader = None
     searcher = None
     dbhelper = None
+    rsshelper = None
     subscribe = None
 
     def __init__(self):
@@ -39,21 +38,15 @@ class Rss:
         self.siteconf = SiteConf()
         self.filter = Filter()
         self.dbhelper = DbHelper()
+        self.rsshelper = RssHelper()
         self.subscribe = Subscribe()
-        self._sites = self.sites.get_sites(rss=True)
 
     def rssdownload(self):
         """
-        RSS订阅检索下载入口，由定时服务调用
+        RSS订阅搜索下载入口，由定时服务调用
         """
-        rss_items = {}
-
-        def __update_no_exist(rss_id, download_item, match_info, no_exists):
-            rss_items.setdefault(rss_id, {})
-            rss_items[rss_id].setdefault('media_list', []).append(download_item)
-            rss_items[rss_id]['match_info'] = match_info
-            rss_items[rss_id]['no_exists'] = no_exists
-        if not self._sites:
+        rss_sites_info = self.sites.get_sites(rss=True)
+        if not rss_sites_info:
             return
 
         with lock:
@@ -102,12 +95,12 @@ class Rss:
 
             total_num = 0
             # 遍历站点资源
-            for site_info in self._sites:
+            for site_info in rss_sites_info:
                 if not site_info:
                     continue
                 # 站点名称
                 site_name = site_info.get("name")
-                # 没有订阅的站点中的不检索
+                # 没有订阅的站点中的不搜索
                 if check_sites and site_name not in check_sites:
                     continue
                 # 站点rss链接
@@ -131,7 +124,15 @@ class Rss:
                     site_order = 100 - int(site_info.get("pri"))
                 else:
                     site_order = 0
-                rss_acticles = self.parse_rssxml(rss_url)
+                rss_acticles = self.rsshelper.parse_rssxml(url=rss_url)
+                if rss_acticles is None:
+                    # RSS链接过期
+                    log.error(f"【Rss】站点 {site_name} RSS链接已过期，请重新获取！")
+                    # 发送消息
+                    self.message.send_site_message(title="【RSS链接过期提醒】",
+                                                   text=f"站点：{site_name}\n"
+                                                        f"链接：{rss_url}")
+                    continue
                 if not rss_acticles:
                     log.warn(f"【Rss】{site_name} 未下载到数据")
                     continue
@@ -152,10 +153,10 @@ class Rss:
                         # 开始处理
                         log.info(f"【Rss】开始处理：{title}")
                         # 检查这个种子是不是下过了
-                        if self.dbhelper.is_torrent_rssd(enclosure):
+                        if self.rsshelper.is_rssd_by_enclosure(enclosure):
                             log.info(f"【Rss】{title} 已成功订阅过")
                             continue
-                        # 识别种子名称，开始检索TMDB
+                        # 识别种子名称，开始搜索TMDB
                         media_info = MetaInfo(title=title)
                         cache_info = self.media.get_cache_info(media_info)
                         if cache_info.get("id"):
@@ -228,7 +229,7 @@ class Rss:
                         media_info.set_download_info(download_setting=match_info.get("download_setting"),
                                                      save_path=match_info.get("save_path"))
                         # 插入数据库历史记录
-                        self.dbhelper.insert_rss_torrents(media_info)
+                        self.rsshelper.insert_rss_torrents(media_info)
                         # 加入下载列表
 
                         __update_no_exist(match_info.get("id"), media_info, match_info, no_exists)
@@ -243,87 +244,6 @@ class Rss:
                 return
             for rid, item in rss_items.items():
                 self.subscribe.subscribe_media(item['match_info'], item['media_list'], item['no_exists'])
-
-    @staticmethod
-    def parse_rssxml(url, proxy=False):
-        """
-        解析RSS订阅URL，获取RSS中的种子信息
-        :param url: RSS地址
-        :param proxy: 是否使用代理
-        :return: 种子信息列表
-        """
-        _special_title_sites = {
-            'pt.keepfrds.com': RssTitleUtils.keepfriends_title
-        }
-
-        # 开始处理
-        ret_array = []
-        if not url:
-            return []
-        site_domain = StringUtils.get_url_domain(url)
-        try:
-            ret = RequestUtils(proxies=Config().get_proxies() if proxy else None).get_res(url)
-            if not ret:
-                return []
-            ret.encoding = ret.apparent_encoding
-        except Exception as e2:
-            ExceptionUtils.exception_traceback(e2)
-            log.console(str(e2))
-            return []
-        if ret:
-            ret_xml = ret.text
-            try:
-                # 解析XML
-                dom_tree = xml.dom.minidom.parseString(ret_xml)
-                rootNode = dom_tree.documentElement
-                items = rootNode.getElementsByTagName("item")
-                for item in items:
-                    try:
-                        # 标题
-                        title = DomUtils.tag_value(item, "title", default="")
-                        if not title:
-                            continue
-                        # 标题特殊处理
-                        if site_domain and site_domain in _special_title_sites:
-                            title = _special_title_sites.get(site_domain)(title)
-                        # 描述
-                        description = DomUtils.tag_value(item, "description", default="")
-                        # 种子页面
-                        link = DomUtils.tag_value(item, "link", default="")
-                        # 种子链接
-                        enclosure = DomUtils.tag_value(item, "enclosure", "url", default="")
-                        if not enclosure and not link:
-                            continue
-                        # 部分RSS只有link没有enclosure
-                        if not enclosure and link:
-                            enclosure = link
-                            link = None
-                        # 大小
-                        size = DomUtils.tag_value(item, "enclosure", "length", default=0)
-                        if size and str(size).isdigit():
-                            size = int(size)
-                        else:
-                            size = 0
-                        # 发布日期
-                        pubdate = DomUtils.tag_value(item, "pubDate", default="")
-                        if pubdate:
-                            # 转换为时间
-                            pubdate = StringUtils.get_time_stamp(pubdate)
-                        # 返回对象
-                        tmp_dict = {'title': title,
-                                    'enclosure': enclosure,
-                                    'size': size,
-                                    'description': description,
-                                    'link': link,
-                                    'pubdate': pubdate}
-                        ret_array.append(tmp_dict)
-                    except Exception as e1:
-                        ExceptionUtils.exception_traceback(e1)
-                        continue
-            except Exception as e2:
-                ExceptionUtils.exception_traceback(e2)
-                return ret_array
-        return ret_array
 
     def check_torrent_rss(self,
                           media_info,
@@ -392,7 +312,7 @@ class Rss:
                     if year and str(year) != str(media_info.year):
                         continue
                     # 匹配关键字或正则表达式
-                    search_title = f"{media_info.org_string} {media_info.title} {media_info.year}"
+                    search_title = f"{media_info.rev_string} {media_info.title} {media_info.year}"
                     if not re.search(name, search_title, re.I) and name not in search_title:
                         continue
                 # 媒体匹配成功
@@ -437,7 +357,7 @@ class Rss:
                     if year and str(year) != str(media_info.year):
                         continue
                     # 匹配关键字或正则表达式
-                    search_title = f"{media_info.org_string} {media_info.title} {media_info.year}"
+                    search_title = f"{media_info.rev_string} {media_info.title} {media_info.year}"
                     if not re.search(name, search_title, re.I) and name not in search_title:
                         continue
                 # 媒体匹配成功
@@ -506,3 +426,91 @@ class Rss:
                 media_info.get_title_string(),
                 media_info.get_season_episode_string()))
             return False, match_msg, match_rss_info
+
+    def download_rss_torrent(self, rss_download_torrents, rss_no_exists):
+        """
+        根据缺失情况以及匹配到的结果选择下载种子
+        """
+
+        if not rss_download_torrents:
+            return
+
+        finished_rss_torrents = []
+        updated_rss_torrents = []
+
+        def __finish_rss(download_item):
+            """
+            完成订阅
+            """
+            if not download_item:
+                return
+            if not download_item.rssid \
+                    or download_item.rssid in finished_rss_torrents:
+                return
+            finished_rss_torrents.append(download_item.rssid)
+            self.subscribe.finish_rss_subscribe(rssid=download_item.rssid,
+                                                media=download_item)
+
+        def __update_tv_rss(download_item, left_media):
+            """
+            更新订阅集数
+            """
+            if not download_item or not left_media:
+                return
+            if not download_item.rssid \
+                    or download_item.rssid in updated_rss_torrents:
+                return
+            updated_rss_torrents.append(download_item.rssid)
+            self.subscribe.update_subscribe_tv_lack(rssid=download_item.rssid,
+                                                    media_info=download_item,
+                                                    seasoninfo=left_media)
+
+        def __update_over_edition(download_item):
+            """
+            更新洗版订阅
+            """
+            if not download_item:
+                return
+            if not download_item.rssid \
+                    or download_item.rssid in updated_rss_torrents:
+                return
+            if download_item.get_episode_list():
+                return
+            updated_rss_torrents.append(download_item.rssid)
+            self.subscribe.update_subscribe_over_edition(rtype=download_item.type,
+                                                         rssid=download_item.rssid,
+                                                         media=download_item)
+
+        # 去重择优后开始添加下载
+        download_items, left_medias = self.downloader.batch_download(SearchType.RSS,
+                                                                     rss_download_torrents,
+                                                                     rss_no_exists)
+        # 批量删除订阅
+        if download_items:
+            for item in download_items:
+                if not item.rssid:
+                    continue
+                if item.over_edition:
+                    # 更新洗版订阅
+                    __update_over_edition(item)
+                elif not left_medias or not left_medias.get(item.tmdb_id):
+                    # 删除电视剧订阅
+                    __finish_rss(item)
+                else:
+                    # 更新电视剧缺失剧集
+                    __update_tv_rss(item, left_medias.get(item.tmdb_id))
+            log.info("【Rss】实际下载了 %s 个资源" % len(download_items))
+        else:
+            log.info("【Rss】未下载到任何资源")
+
+    def delete_rss_history(self, rssid):
+        """
+        删除订阅历史
+        """
+        self.dbhelper.delete_rss_history(rssid=rssid)
+
+    def get_rss_history(self, rtype=None, rid=None):
+        """
+        获取订阅历史
+        """
+        return self.dbhelper.get_rss_history(rtype=rtype, rid=rid)

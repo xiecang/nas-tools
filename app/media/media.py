@@ -16,7 +16,7 @@ from app.media.tmdbv3api import TMDb, Search, Movie, TV, Person, Find, TMDbExcep
 from app.utils import PathUtils, EpisodeFormat, RequestUtils, NumberUtils, StringUtils, cacheman
 from app.utils.types import MediaType, MatchMode
 from config import Config, KEYWORD_BLACKLIST, KEYWORD_SEARCH_WEIGHT_3, KEYWORD_SEARCH_WEIGHT_2, KEYWORD_SEARCH_WEIGHT_1, \
-    KEYWORD_STR_SIMILARITY_THRESHOLD, KEYWORD_DIFF_SCORE_THRESHOLD, TMDB_PEOPLE_PROFILE_URL
+    KEYWORD_STR_SIMILARITY_THRESHOLD, KEYWORD_DIFF_SCORE_THRESHOLD
 
 
 class Media:
@@ -128,7 +128,7 @@ class Media:
 
     def __search_tmdb_allnames(self, mtype: MediaType, tmdb_id):
         """
-        检索tmdb中所有的标题和译名，用于名称匹配
+        搜索tmdb中所有的标题和译名，用于名称匹配
         :param mtype: 类型：电影、电视剧、动漫
         :param tmdb_id: TMDB的ID
         :return: 所有译名的清单
@@ -181,7 +181,7 @@ class Media:
             return None
         if not file_media_name:
             return None
-        # TMDB检索
+        # TMDB搜索
         info = {}
         if search_type == MediaType.MOVIE:
             year_range = [first_media_year]
@@ -492,7 +492,7 @@ class Media:
     @lru_cache(maxsize=512)
     def __search_tmdb_web(self, file_media_name, mtype: MediaType):
         """
-        检索TMDB网站，直接抓取结果，结果只有一条时才返回
+        搜索TMDB网站，直接抓取结果，结果只有一条时才返回
         :param file_media_name: 名称
         """
         if not file_media_name:
@@ -509,7 +509,10 @@ class Media:
             try:
                 tmdb_links = []
                 html = etree.HTML(html_text)
-                links = html.xpath("//a[@data-id]/@href")
+                if mtype == MediaType.TV:
+                    links = html.xpath("//a[@data-id and @data-media-type='tv']/@href")
+                else:
+                    links = html.xpath("//a[@data-id]/@href")
                 for link in links:
                     if not link or (not link.startswith("/tv") and not link.startswith("/movie")):
                         continue
@@ -883,12 +886,12 @@ class Media:
         """
         根据文件清单，搜刮TMDB信息，用于文件名称的识别
         :param file_list: 文件清单，如果是列表也可以是单个文件，也可以是一个目录
-        :param tmdb_info: 如有传入TMDB信息则以该TMDB信息赋于所有文件，否则按名称从TMDB检索，用于手工识别时传入
-        :param media_type: 媒体类型：电影、电视剧、动漫，如有传入以该类型赋于所有文件，否则按名称从TMDB检索并识别
+        :param tmdb_info: 如有传入TMDB信息则以该TMDB信息赋于所有文件，否则按名称从TMDB搜索，用于手工识别时传入
+        :param media_type: 媒体类型：电影、电视剧、动漫，如有传入以该类型赋于所有文件，否则按名称从TMDB搜索并识别
         :param season: 季号，如有传入以该季号赋于所有文件，否则从名称中识别
         :param episode_format: EpisodeFormat
         :param language: 语言
-        :param chinese: 原标题为英文时是否从别名中检索中文名称
+        :param chinese: 原标题为英文时是否从别名中搜索中文名称
         :param append_to_response: 附加信息
         :return: 带有TMDB信息的每个文件对应的MetaInfo对象字典
         """
@@ -1674,7 +1677,7 @@ class Media:
             "credit_id": crew.get("credit_id"),
             "department": crew.get("department"),
             "job": crew.get("job"),
-            "profile": TMDB_PEOPLE_PROFILE_URL % crew.get('id')
+            "profile": 'https://www.themoviedb.org/person/%s' % crew.get('id')
         } for crew in crews or []]
 
     @staticmethod
@@ -1694,7 +1697,7 @@ class Media:
             "role": cast.get("character"),
             "credit_id": cast.get("credit_id"),
             "order": cast.get("order"),
-            "profile": TMDB_PEOPLE_PROFILE_URL % cast.get('id')
+            "profile": 'https://www.themoviedb.org/person/%s' % cast.get('id')
         } for cast in casts or []]
 
     def get_tmdb_directors_actors(self, tmdbinfo):

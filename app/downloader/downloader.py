@@ -35,6 +35,7 @@ class Downloader:
     _download_order = None
     _download_settings = {}
     _downloader_confs = {}
+    _monitor_downloader_ids = []
     # 下载器ID-名称枚举类
     _DownloaderEnum = None
     _scheduler = None
@@ -71,22 +72,42 @@ class Downloader:
         self.clients = {}
         # 下载器配置，生成实例
         self._downloader_confs = {}
-        downloaders_conf = self.dbhelper.get_downloaders()
-        for downloader_conf in downloaders_conf:
+        self._monitor_downloader_ids = []
+        for downloader_conf in self.dbhelper.get_downloaders():
+            if not downloader_conf:
+                continue
             did = downloader_conf.ID
+            name = downloader_conf.NAME
+            enabled = downloader_conf.ENABLED
+            # 下载器监控配置
+            transfer = downloader_conf.TRANSFER
+            only_nastool = downloader_conf.ONLY_NASTOOL
+            match_path = downloader_conf.MATCH_PATH
             rmt_mode = downloader_conf.RMT_MODE
             rmt_mode_name = ModuleConf.RMT_MODES.get(rmt_mode).value if rmt_mode else ""
-            enabled = downloader_conf.ENABLED
+            # 输出日志
+            if transfer:
+                log_content = ""
+                if only_nastool:
+                    log_content += "启用标签隔离，"
+                if match_path:
+                    log_content += "启用目录隔离，"
+                log.info(f"【Downloader】读取到监控下载器：{name}{log_content}转移方式：{rmt_mode_name}")
+                if enabled:
+                    self._monitor_downloader_ids.append(did)
+                else:
+                    log.info(f"【Downloader】下载器：{name} 不进行监控：下载器未启用")
+            # 下载器登录配置
             config = json.loads(downloader_conf.CONFIG)
             dtype = downloader_conf.TYPE
             self._downloader_confs[str(did)] = {
                 "id": did,
-                "name": downloader_conf.NAME,
+                "name": name,
                 "type": dtype,
                 "enabled": enabled,
-                "transfer": downloader_conf.TRANSFER,
-                "only_nastool": downloader_conf.ONLY_NASTOOL,
-                "match_path": downloader_conf.MATCH_PATH,
+                "transfer": transfer,
+                "only_nastool": only_nastool,
+                "match_path": match_path,
                 "rmt_mode": rmt_mode,
                 "rmt_mode_name": rmt_mode_name,
                 "config": config,
@@ -105,7 +126,6 @@ class Downloader:
                 "name": "预设",
                 "category": '',
                 "tags": PT_TAG,
-                "content_layout": 0,
                 "is_paused": 0,
                 "upload_limit": 0,
                 "download_limit": 0,
@@ -132,7 +152,6 @@ class Downloader:
                 "name": download_setting.NAME,
                 "category": download_setting.CATEGORY,
                 "tags": download_setting.TAGS,
-                "content_layout": download_setting.CONTENT_LAYOUT,
                 "is_paused": download_setting.IS_PAUSED,
                 "upload_limit": download_setting.UPLOAD_LIMIT,
                 "download_limit": download_setting.DOWNLOAD_LIMIT,
@@ -142,7 +161,8 @@ class Downloader:
                 "downloader_name": downloader_name,
                 "downloader_type": downloader_type
             }
-        self.transfer_scheduler()
+        # 启动下载器监控服务
+        self.start_service()
 
     def __build_class(self, ctype, conf=None):
         for downloader_schema in self._downloader_schema:
@@ -194,37 +214,26 @@ class Downloader:
         """
         获取监控下载器ID列表
         """
-        ret_list = []
-        for downloader_conf in self.get_downloader_conf().values():
-            if downloader_conf.get("enabled") and downloader_conf.get("transfer") and downloader_conf.get("rmt_mode"):
-                ret_list.append(downloader_conf.get("id"))
-        return ret_list
+        return self._monitor_downloader_ids
 
-    def transfer_scheduler(self):
+    def start_service(self):
         """
         转移任务调度
         """
         # 移出现有任务
-        try:
-            if self._scheduler:
-                self._scheduler.remove_all_jobs()
-                if self._scheduler.running:
-                    self._scheduler.shutdown()
-                self._scheduler = None
-        except Exception as e:
-            ExceptionUtils.exception_traceback(e)
+        self.stop_service()
         # 启动转移任务
-        if not self.monitor_downloader_ids:
+        if not self._monitor_downloader_ids:
             return
         self._scheduler = BackgroundScheduler(timezone=Config().get_timezone())
-        for downloader_id in self.monitor_downloader_ids:
+        for downloader_id in self._monitor_downloader_ids:
             self._scheduler.add_job(func=self.transfer,
                                     args=[downloader_id],
                                     trigger='interval',
                                     seconds=PT_TRANSFER_INTERVAL)
         self._scheduler.print_jobs()
         self._scheduler.start()
-        log.info("下载文件转移服务启动")
+        log.info("下载文件转移服务启动，目的目录：媒体库")
 
     def __get_client(self, did=None):
         if not did:
@@ -239,6 +248,7 @@ class Downloader:
         ctype = downloader_conf.get("type")
         config = downloader_conf.get("config")
         config["download_dir"] = downloader_conf.get("download_dir")
+        config["name"] = downloader_conf.get("name")
         with client_lock:
             if not self.clients.get(str(did)):
                 self.clients[str(did)] = self.__build_class(ctype, config)
@@ -256,7 +266,7 @@ class Downloader:
                  torrent_file=None,
                  in_from=None,
                  user_name=None,
-                 is_auto=None):
+                 proxy=None):
         """
         添加下载任务，根据当前使用的下载器分别调用不同的客户端处理
         :param media_info: 需下载的媒体信息，含URL地址
@@ -270,7 +280,7 @@ class Downloader:
         :param torrent_file: 种子文件路径
         :param in_from: 来源
         :param user_name: 用户名
-        :param is_auto: 是否开始自动管理模式
+        :param proxy: 是否使用代理，指定该选项为 True/False 会覆盖 site_info 的设置
         :return: 下载器类型, 种子ID，错误信息
         """
 
@@ -328,7 +338,7 @@ class Downloader:
                     cookie=site_info.get("cookie"),
                     ua=site_info.get("ua"),
                     referer=page_url if site_info.get("referer") else None,
-                    proxy=site_info.get("proxy")
+                    proxy=proxy if proxy is not None else site_info.get("proxy")
                 )
 
         # 解析完成
@@ -370,7 +380,7 @@ class Downloader:
 
         # 开始添加下载
         try:
-            # 分类
+            # 下载设置中的分类
             category = download_attr.get("category")
             # 合并TAG
             tags = download_attr.get("tags")
@@ -387,16 +397,7 @@ class Downloader:
                         tags = tag
                     else:
                         tags = [tag]
-            # 布局
-            content_layout = download_attr.get("content_layout")
-            if content_layout == 1:
-                content_layout = "Original"
-            elif content_layout == 2:
-                content_layout = "Subfolder"
-            elif content_layout == 3:
-                content_layout = "NoSubfolder"
-            else:
-                content_layout = ""
+
             # 暂停
             if is_paused is None:
                 is_paused = StringUtils.to_bool(download_attr.get("is_paused"))
@@ -412,13 +413,13 @@ class Downloader:
             ratio_limit = download_attr.get("ratio_limit")
             # 做种时间
             seeding_time_limit = download_attr.get("seeding_time_limit")
-            # 下载目录
+            # 下载目录设置
             if not download_dir:
                 download_info = self.__get_download_dir_info(media_info, downloader_conf.get("download_dir"))
                 download_dir = download_info.get('path')
-                download_label = download_info.get('label')
+                # 从下载目录中获取分类标签
                 if not category:
-                    category = download_label
+                    category = download_info.get('category')
             # 添加下载
             print_url = content if isinstance(content, str) else url
             if is_paused:
@@ -443,15 +444,22 @@ class Downloader:
                                               download_limit=download_limit,
                                               ratio_limit=ratio_limit,
                                               seeding_time_limit=seeding_time_limit)
+
             elif downloader_type == DownloaderType.QB:
+                # 加标签以获取添加下载后的编号
+                torrent_tag = "NT" + StringUtils.generate_random_str(5)
+                if tags:
+                    tags += [torrent_tag]
+                else:
+                    tags = [torrent_tag]
+                # 布局默认原始
                 ret = downloader.add_torrent(content,
                                              torrent_hash=torrent_hash,
                                              is_paused=is_paused,
-                                             is_auto=is_auto,
                                              download_dir=download_dir,
                                              tag=tags,
                                              category=category,
-                                             content_layout=content_layout,
+                                             content_layout="Original",
                                              upload_limit=upload_limit,
                                              download_limit=download_limit,
                                              ratio_limit=ratio_limit,
@@ -524,7 +532,7 @@ class Downloader:
         转移下载完成的文件，进行文件识别重命名到媒体库目录
         """
         downloader_ids = [downloader_id] if downloader_id \
-            else self.monitor_downloader_ids
+            else self._monitor_downloader_ids
         for downloader_id in downloader_ids:
             with lock:
                 # 获取下载器配置
@@ -533,15 +541,11 @@ class Downloader:
                 only_nastool = downloader_conf.get("only_nastool")
                 match_path = downloader_conf.get("match_path")
                 rmt_mode = ModuleConf.RMT_MODES.get(downloader_conf.get("rmt_mode"))
-                if only_nastool:
-                    tag = [PT_TAG]
-                else:
-                    tag = None
                 # 获取下载器实例
                 _client = self.__get_client(downloader_id)
                 if not _client:
                     continue
-                trans_tasks = _client.get_transfer_task(tag=tag, match_path=match_path)
+                trans_tasks = _client.get_transfer_task(tag=PT_TAG if only_nastool else None, match_path=match_path)
                 if trans_tasks:
                     log.info(f"【Downloader】下载器 {name} 开始转移下载文件...")
                 else:
@@ -898,7 +902,7 @@ class Downloader:
         """
         检查媒体库，查询是否存在，对于剧集同时返回不存在的季集信息
         :param meta_info: 已识别的媒体信息，包括标题、年份、季、集信息
-        :param no_exists: 在调用该方法前已经存储的不存在的季集信息，有传入时该函数检索的内容将会叠加后输出
+        :param no_exists: 在调用该方法前已经存储的不存在的季集信息，有传入时该函数搜索的内容将会叠加后输出
         :param total_ep: 各季的总集数
         :return: 当前媒体是否缺失，各标题总的季集和缺失的季集，需要发送的消息
         """
@@ -919,9 +923,8 @@ class Downloader:
         if meta_info.type != MediaType.MOVIE:
             # 是否存在的标志
             return_flag = False
-            # 检索电视剧的信息
-            tv_info = self.media.get_tmdb_info(
-                mtype=MediaType.TV, tmdbid=meta_info.tmdb_id)
+            # 搜索电视剧的信息
+            tv_info = self.media.get_tmdb_info(mtype=MediaType.TV, tmdbid=meta_info.tmdb_id)
             if tv_info:
                 # 传入检查季
                 total_seasons = []
@@ -1183,7 +1186,8 @@ class Downloader:
         _client = self.__get_client(downloader_id)
         if not _client:
             return ""
-        return _client.get_replace_path(download_dir, downloader_conf.get("download_dir"))
+        true_path, _ = _client.get_replace_path(download_dir, downloader_conf.get("download_dir"))
+        return true_path
 
     @staticmethod
     def __get_download_dir_info(media, downloaddir):
@@ -1209,8 +1213,11 @@ class Downloader:
                     StringUtils.num_filesize(media.size)
                 ):
                     continue
-                return {"path": attr.get("save_path"), "label": attr.get("label")}
-        return {"path": None, "label": None}
+                return {
+                    "path": attr.get("save_path"),
+                    "category": attr.get("label")
+                }
+        return {"path": None, "category": None}
 
     @staticmethod
     def __get_client_type(type_name):
@@ -1344,3 +1351,123 @@ class Downloader:
         if not _client:
             return False
         return _client.recheck_torrents(ids)
+
+    def stop_service(self):
+        """
+        停止服务
+        """
+        try:
+            if self._scheduler:
+                self._scheduler.remove_all_jobs()
+                if self._scheduler.running:
+                    self._scheduler.shutdown()
+                self._scheduler = None
+        except Exception as e:
+            print(str(e))
+
+    def get_download_history(self, date=None, hid=None, num=30, page=1):
+        """
+        获取下载历史记录
+        """
+        return self.dbhelper.get_download_history(date=date, hid=hid, num=num, page=page)
+
+    def get_download_history_by_title(self, title):
+        """
+        根据标题查询下载历史记录
+        :return:
+        """
+        return self.dbhelper.get_download_history_by_title(title=title) or []
+
+    def get_download_history_by_downloader(self, downloader, download_id):
+        """
+        根据下载器和下载ID查询下载历史记录
+        :return:
+        """
+        return self.dbhelper.get_download_history_by_downloader(downloader=downloader,
+                                                                download_id=download_id)
+
+    def update_downloader(self,
+                          did,
+                          name,
+                          enabled,
+                          dtype,
+                          transfer,
+                          only_nastool,
+                          match_path,
+                          rmt_mode,
+                          config,
+                          download_dir):
+        """
+        更新下载器
+        """
+        ret = self.dbhelper.update_downloader(
+            did=did,
+            name=name,
+            enabled=enabled,
+            dtype=dtype,
+            transfer=transfer,
+            only_nastool=only_nastool,
+            match_path=match_path,
+            rmt_mode=rmt_mode,
+            config=config,
+            download_dir=download_dir
+        )
+        self.init_config()
+        return ret
+
+    def delete_downloader(self, did):
+        """
+        删除下载器
+        """
+        ret = self.dbhelper.delete_downloader(did=did)
+        self.init_config()
+        return ret
+
+    def check_downloader(self, did=None, transfer=None, only_nastool=None, enabled=None, match_path=None):
+        """
+        检查下载器
+        """
+        ret = self.dbhelper.check_downloader(did=did,
+                                             transfer=transfer,
+                                             only_nastool=only_nastool,
+                                             enabled=enabled,
+                                             match_path=match_path)
+        self.init_config()
+        return ret
+
+    def delete_download_setting(self, sid):
+        """
+        删除下载设置
+        """
+        ret = self.dbhelper.delete_download_setting(sid=sid)
+        self.init_config()
+        return ret
+
+    def update_download_setting(self,
+                                sid,
+                                name,
+                                category,
+                                tags,
+                                is_paused,
+                                upload_limit,
+                                download_limit,
+                                ratio_limit,
+                                seeding_time_limit,
+                                downloader):
+        """
+        更新下载设置
+        """
+        ret = self.dbhelper.update_download_setting(
+            sid=sid,
+            name=name,
+            category=category,
+            tags=tags,
+            is_paused=is_paused,
+            upload_limit=upload_limit,
+            download_limit=download_limit,
+            ratio_limit=ratio_limit,
+            seeding_time_limit=seeding_time_limit,
+            downloader=downloader
+        )
+        self.init_config()
+        return ret

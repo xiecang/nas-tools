@@ -134,7 +134,7 @@ class MediaServer:
 
     def get_local_image_by_id(self, item_id):
         """
-        根据ItemId从媒体服务器查询有声书图片地址
+        根据ItemId从媒体服务器查询图片地址
         :param item_id: 在Emby中的ID
         """
         if not self.server:
@@ -377,3 +377,19 @@ class MediaServer:
             self.message.send_mediaserver_message(event_info=event_info,
                                                   channel=channel.value,
                                                   image_url=image_url)
+
+    def get_resume(self, num=12):
+        """
+        获取继续观看
+        """
+        if not self.server:
+            return []
+        return self.server.get_resume(num=num)
+
+    def get_latest(self, num=20):
+        """
+        获取最近添加
+        """
+        if not self.server:
+            return []
+        return self.server.get_latest(num=num)

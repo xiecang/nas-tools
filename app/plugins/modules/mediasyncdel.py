@@ -1,9 +1,8 @@
 import os
 import time
 
-from app.helper import DbHelper
+from app.filetransfer import FileTransfer
 from app.media import Media
-from app.message import Message
 from app.plugins import EventHandler
 from app.plugins.modules._base import _IPluginModule
 from app.utils.types import EventType, MediaType
@@ -33,8 +32,7 @@ class MediaSyncDel(_IPluginModule):
     auth_level = 1
 
     # 私有属性
-    dbhelper = None
-    message = None
+    filetransfer = None
     _enable = False
     _del_source = False
     _exclude_path = None
@@ -66,7 +64,7 @@ class MediaSyncDel(_IPluginModule):
                         {
                             'title': '运行时通知',
                             'required': "",
-                            'tooltip': '打开后Emby触发同步删除后会发送通知（需要打开自定义消息通知）',
+                            'tooltip': '打开后Emby触发同步删除后会发送通知（需要打开插件消息通知）',
                             'type': 'switch',
                             'id': 'send_notify',
                         }
@@ -95,8 +93,7 @@ class MediaSyncDel(_IPluginModule):
         ]
 
     def init_config(self, config=None):
-        self.dbhelper = DbHelper()
-        self.message = Message()
+        self.filetransfer = FileTransfer()
 
         # 读取配置
         if config:
@@ -167,12 +164,12 @@ class MediaSyncDel(_IPluginModule):
         if media_type == "Movie":
             msg = f'电影 {media_name} {tmdb_id}'
             self.info(f"正在同步删除{msg}")
-            transfer_history = self.dbhelper.get_transfer_info_by(tmdbid=tmdb_id)
+            transfer_history = self.filetransfer.get_transfer_info_by(tmdbid=tmdb_id)
         # 删除电视剧
         elif media_type == "Series":
             msg = f'剧集 {media_name} {tmdb_id}'
             self.info(f"正在同步删除{msg}")
-            transfer_history = self.dbhelper.get_transfer_info_by(tmdbid=tmdb_id)
+            transfer_history = self.filetransfer.get_transfer_info_by(tmdbid=tmdb_id)
         # 删除季 S02
         elif media_type == "Season":
             if not season_num or not str(season_num).isdigit():
@@ -180,7 +177,7 @@ class MediaSyncDel(_IPluginModule):
                 return
             msg = f'剧集 {media_name} S{season_num} {tmdb_id}'
             self.info(f"正在同步删除{msg}")
-            transfer_history = self.dbhelper.get_transfer_info_by(tmdbid=tmdb_id, season=f'S{season_num}')
+            transfer_history = self.filetransfer.get_transfer_info_by(tmdbid=tmdb_id, season=f'S{season_num}')
         # 删除剧集S02E02
         elif media_type == "Episode":
             if not season_num or not str(season_num).isdigit() or not episode_num or not str(episode_num).isdigit():
@@ -188,7 +185,7 @@ class MediaSyncDel(_IPluginModule):
                 return
             msg = f'剧集 {media_name} S{season_num}E{episode_num} {tmdb_id}'
             self.info(f"正在同步删除{msg}")
-            transfer_history = self.dbhelper.get_transfer_info_by(tmdbid=tmdb_id,
+            transfer_history = self.filetransfer.get_transfer_info_by(tmdbid=tmdb_id,
                                                                   season_episode=f'S{season_num} E{episode_num}')
         else:
             return
@@ -227,7 +224,7 @@ class MediaSyncDel(_IPluginModule):
                 image_url = Media().get_tmdb_backdrop(mtype=MediaType.MOVIE if media_type == "Movie" else MediaType.TV,
                                                       tmdbid=tmdb_id)
             # 发送通知
-            self.message.send_custom_message(
+            self.send_message(
                 title="【Emby同步删除任务完成】",
                 image=image_url or 'https://emby.media/notificationicon.png',
                 text=f"{msg}\n"

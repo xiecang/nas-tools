@@ -22,8 +22,8 @@ class Filter:
     def init_config(self):
         self.dbhelper = DbHelper()
         self.rg_matcher = ReleaseGroupsMatcher()
-        self._groups = self.dbhelper.get_config_filter_group()
-        self._rules = self.dbhelper.get_config_filter_rule()
+        self._groups = self.get_filter_group()
+        self._rules = self.get_filter_rule()
 
     def get_rule_groups(self, groupid=None, default=False):
         """
@@ -106,9 +106,7 @@ class Filter:
         if rulegroup and int(rulegroup) == -1:
             return True, 0, "不过滤"
         # 过滤使用的文本
-        title = meta_info.org_string
-        if meta_info.labels:
-            title = f"{title} {meta_info.labels}"
+        title = meta_info.rev_string
         if meta_info.subtitle:
             title = f"{title} {meta_info.subtitle}"
         # 过滤规则组
@@ -257,6 +255,10 @@ class Filter:
         :param downloadvolumefactor: 种子的下载因子 传空不过滤
         :return: 是否匹配，匹配的优先值，匹配信息，值越大越优先
         """
+        # 过滤包含，排除，关键字使用的文本
+        text = meta_info.rev_string
+        if meta_info.subtitle:
+            text = f"{text} {meta_info.subtitle}"
         # 过滤质量
         if filter_args.get("restype"):
             restype_re = ModuleConf.TORRENT_SEARCH_PARAMS["restype"].get(filter_args.get("restype"))
@@ -276,7 +278,7 @@ class Filter:
             team = filter_args.get("team")
             if not meta_info.resource_team:
                 resource_team = self.rg_matcher.match(
-                    title=meta_info.org_string,
+                    title=meta_info.rev_string,
                     groups=team)
                 if not resource_team:
                     return False, 0, f"{meta_info.org_string} 不符合制作组/字幕组 {team} 要求"
@@ -294,17 +296,17 @@ class Filter:
         # 过滤包含
         if filter_args.get("include"):
             include = filter_args.get("include")
-            if not re.search(r"%s" % include, meta_info.org_string, re.I):
+            if not re.search(r"%s" % include, text, re.I):
                 return False, 0, f"{meta_info.org_string} 不符合包含 {include} 要求"
         # 过滤排除
         if filter_args.get("exclude"):
             exclude = filter_args.get("exclude")
-            if re.search(r"%s" % exclude, meta_info.org_string, re.I):
+            if re.search(r"%s" % exclude, text, re.I):
                 return False, 0, f"{meta_info.org_string} 不符合排除 {exclude} 要求"
         # 过滤关键字
         if filter_args.get("key"):
             key = filter_args.get("key")
-            if not re.search(r"%s" % key, meta_info.org_string, re.I):
+            if not re.search(r"%s" % key, text, re.I):
                 return False, 0, f"{meta_info.org_string} 不符合 {key} 要求"
         # 过滤过滤规则，-1表示不使用过滤规则，空则使用默认过滤规则
         if filter_args.get("rule"):
@@ -327,3 +329,61 @@ class Filter:
                 rule_name
             )
             return match_flag, order_seq, match_msg
+
+    def add_group(self, name, default='N'):
+        """
+        添加过滤规则组
+        """
+        ret = self.dbhelper.add_filter_group(name, default)
+        self.init_config()
+        return ret
+
+    def delete_filtergroup(self, groupid):
+        """
+        删除过滤规则组
+        """
+        ret = self.dbhelper.delete_filtergroup(groupid)
+        self.init_config()
+        return ret
+
+    def set_default_filtergroup(self, groupid):
+        """
+        设置默认过滤规则组
+        """
+        ret = self.dbhelper.set_default_filtergroup(groupid)
+        self.init_config()
+        return ret
+
+    def add_filter_rule(self, item, ruleid=None):
+        """
+        添加过滤规则
+        """
+        ret = self.dbhelper.insert_filter_rule(item, ruleid)
+        self.init_config()
+        return ret
+
+    def delete_filterrule(self, ruleid):
+        """
+        删除过滤规则
+        """
+        ret = self.dbhelper.delete_filterrule(ruleid)
+        self.init_config()
+        return ret
+
+    def get_filter_group(self, gid=None):
+        """
+        获取过滤规则组
+        """
+        return self.dbhelper.get_config_filter_group(gid)
+
+    def get_filter_rule(self, groupid=None):
+        """
+        获取过滤规则
+        """
+        return self.dbhelper.get_config_filter_rule(groupid)
+
+    def get_filter_groupid_by_name(self, name):
+        """
+        根据名称获取过滤规则组ID
+        """
+        return self.dbhelper.get_filter_groupid_by_name(name)
