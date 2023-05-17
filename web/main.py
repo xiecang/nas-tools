@@ -1750,6 +1750,7 @@ def message_handler(ws):
     消息中心WebSocket
     """
     while True:
+        print(11111111111111111111111111111111111)
         data = ws.receive()
         if not data:
             continue

@@ -34,7 +34,6 @@ class Prowlarr(_IIndexClient):
     def match(cls, ctype):
         return True if ctype in [cls.schema, cls.index_type] else False
 
-
     def get_type(self):
         return self.client_type
 
@@ -47,7 +46,7 @@ class Prowlarr(_IIndexClient):
             return False
         return True if self.get_indexers() else False
 
-    def get_indexers(self):
+    def get_indexers(self, checked=True):
         """
         获取配置的prowlarr indexer
         :return: indexer 信息 [(indexerId, indexerName, url)]

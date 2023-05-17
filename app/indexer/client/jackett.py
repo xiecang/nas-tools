@@ -34,7 +34,6 @@ class Jackett(_IIndexClient):
                 if not self.host.endswith('/'):
                     self.host = self.host + "/"
 
-
     def get_type(self):
         return self.client_type
 
@@ -51,7 +50,7 @@ class Jackett(_IIndexClient):
     def match(cls, ctype):
         return True if ctype in [cls.schema, cls.index_type] else False
 
-    def get_indexers(self):
+    def get_indexers(self, check=True):
         """
         获取配置的jackett indexer
         :return: indexer 信息 [(indexerId, indexerName, url)]

@@ -2,6 +2,7 @@ import re
 from threading import Lock
 
 import log
+import traceback
 from app.downloader import Downloader
 from app.filter import Filter
 from app.helper import DbHelper, RssHelper
@@ -45,8 +46,17 @@ class Rss:
         """
         RSS订阅搜索下载入口，由定时服务调用
         """
+        rss_items = {}
         rss_sites_info = self.sites.get_sites(rss=True)
         if not rss_sites_info:
+            return
+
+        def __update_no_exist(rss_id, download_item, match_info, no_exists):
+            rss_items.setdefault(rss_id, {})
+            rss_items[rss_id].setdefault('media_list', []).append(download_item)
+            rss_items[rss_id]['match_info'] = match_info
+            rss_items[rss_id]['no_exists'] = no_exists
+        if not self._sites:
             return
 
         with lock:
@@ -94,6 +104,8 @@ class Rss:
                 check_sites = list(set(check_sites))
 
             total_num = 0
+            rss_download_torrents = []
+            rss_no_exists = {}
             # 遍历站点资源
             for site_info in rss_sites_info:
                 if not site_info:
@@ -231,17 +243,15 @@ class Rss:
                         # 插入数据库历史记录
                         self.rsshelper.insert_rss_torrents(media_info)
                         # 加入下载列表
-
                         __update_no_exist(match_info.get("id"), media_info, match_info, no_exists)
                         res_num = res_num + 1
                         total_num += 1
                     except Exception as e:
-                        log.error("【Rss】处理RSS发生错误：" + "".join(traceback.format_exception(e)))
+                        ExceptionUtils.exception_traceback(e)
+                        log.error("【Rss】处理RSS发生错误：%s" % str(e))
                         continue
                 log.info("【Rss】%s 处理结束，匹配到 %s 个有效资源" % (site_name, res_num))
-            log.info("【Rss】所有RSS处理结束，共 %s 个有效资源" % total_num)
-            if not rss_items:
-                return
+            log.info("【Rss】所有RSS处理结束，共 %s 个有效资源" % len(rss_download_torrents))
             for rid, item in rss_items.items():
                 self.subscribe.subscribe_media(item['match_info'], item['media_list'], item['no_exists'])
 
