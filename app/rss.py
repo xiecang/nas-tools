@@ -13,6 +13,7 @@ from app.subscribe import Subscribe
 from app.utils import ExceptionUtils, Torrent
 from app.utils.commons import singleton
 from app.utils.types import MediaType, SearchType
+from app.message import Message
 
 lock = Lock()
 
@@ -28,11 +29,14 @@ class Rss:
     dbhelper = None
     rsshelper = None
     subscribe = None
+    message = None
 
     def __init__(self):
         self.init_config()
 
     def init_config(self):
+
+        self.message = Message()
         self.media = Media()
         self.downloader = Downloader()
         self.sites = Sites()

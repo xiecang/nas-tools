@@ -3671,7 +3671,7 @@ class WebAction:
         return {"code": 0, "result": [rec.as_dict() for rec in Rss().get_rss_history(rtype=mtype)]}
 
     @staticmethod
-    def get_torrents(self, data=None, type='downloading'):
+    def get_torrents(type='downloading'):
         """
         查询正在下载的任务
         """
