@@ -56,8 +56,6 @@ class Rss:
             rss_items[rss_id].setdefault('media_list', []).append(download_item)
             rss_items[rss_id]['match_info'] = match_info
             rss_items[rss_id]['no_exists'] = no_exists
-        if not self._sites:
-            return
 
         with lock:
             log.info("【Rss】开始RSS订阅...")

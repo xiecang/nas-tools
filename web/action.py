@@ -4772,10 +4772,6 @@ class WebAction:
         """
         # 需要过滤的菜单
         ignore = []
-        # 查询最早加入PT站的时间, 如果不足一个月, 则隐藏刷流任务
-        first_pt_site = SiteUserInfo().get_pt_site_min_join_date()
-        if not first_pt_site or not StringUtils.is_one_month_ago(first_pt_site):
-            ignore.append('brushtask')
         # 获取可用菜单
         menus = current_user.get_usermenus(ignore=ignore)
         return {
