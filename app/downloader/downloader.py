@@ -446,12 +446,6 @@ class Downloader:
                                               seeding_time_limit=seeding_time_limit)
 
             elif downloader_type == DownloaderType.QB:
-                # 加标签以获取添加下载后的编号
-                torrent_tag = "NT" + StringUtils.generate_random_str(5)
-                if tags:
-                    tags += [torrent_tag]
-                else:
-                    tags = [torrent_tag]
                 # 布局默认原始
                 ret = downloader.add_torrent(content,
                                              torrent_hash=torrent_hash,

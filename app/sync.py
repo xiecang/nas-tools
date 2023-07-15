@@ -160,14 +160,16 @@ class Sync(object):
         log.debug("【Sync】文件%s：%s" % (text, event_path))
         # 不是监控目录下的文件不处理
         is_monitor_file = False
-        for tpath in self.sync_dir_config.keys():
-            if PathUtils.is_path_in_path(tpath, event_path):
+        for sid in self._monitor_sync_path_ids:
+            tpath = self.get_sync_path_conf(sid)
+            if PathUtils.is_path_in_path(tpath.get('from'), event_path):
                 is_monitor_file = True
                 break
         if not is_monitor_file:
             return
         # 目的目录的子文件不处理
-        for tpath in self.sync_dir_config.values():
+        for sid in self._monitor_sync_path_ids:
+            tpath = self.get_sync_path_conf(sid)
             if not tpath:
                 continue
             if PathUtils.is_path_in_path(tpath.get('target'), event_path):

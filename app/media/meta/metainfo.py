@@ -34,7 +34,7 @@ def MetaInfo(title, subtitle=None, mtype=None):
         fileflag = True
     else:
         fileflag = False
-
+    title = rev_title
     meta_info = MetaVideo(title, subtitle, fileflag)
 
     # 设置原始名称
