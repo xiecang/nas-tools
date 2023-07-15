@@ -23,13 +23,16 @@ class WebUtils:
         url = 'https://sp0.baidu.com/8aQDcjqpAAV3otqbppnN2DJv/api.php?co=&resource_id=6006&t=1529895387942&ie=utf8' \
               '&oe=gbk&cb=op_aladdin_callback&format=json&tn=baidu&' \
               'cb=jQuery110203920624944751099_1529894588086&_=1529894588088&query=%s' % ip
-        r = RequestUtils().get_res(url)
-        r.encoding = 'gbk'
-        html = r.text
         try:
-            c1 = html.split('location":"')[1]
-            c2 = c1.split('","')[0]
-            return c2
+            r = RequestUtils().get_res(url)
+            if r:
+                r.encoding = 'gbk'
+                html = r.text
+                c1 = html.split('location":"')[1]
+                c2 = c1.split('","')[0]
+                return c2
+            else:
+                return ""
         except Exception as err:
             ExceptionUtils.exception_traceback(err)
             return ""
@@ -52,10 +55,8 @@ class WebUtils:
         try:
             releases_update_only = Config().get_config("app").get("releases_update_only")
             version_res = RequestUtils(proxies=Config().get_proxies()).get_res(
-                "https://api.github.com/repos/120318/nas-tools/releases/latest")
-            commit_res = RequestUtils(proxies=Config().get_proxies()).get_res(
-                "https://api.github.com/repos/120318/nas-tools/commits/master")
-            if version_res and commit_res:
+                f"https://nastool.org/{quote(WebUtils.get_current_version())}/update")
+            if version_res:
                 ver_json = version_res.json()
                 version = ver_json.get("latest")
                 link = ver_json.get("link")
@@ -111,7 +112,6 @@ class WebUtils:
                 media_info = Media().get_media_info(title=f"{title_cn} {year}",
                                                     mtype=MediaType.TV,
                                                     append_to_response="all")
-            media_info.douban_id, info = DouBan().search_douban(media_info)
         else:
             # TMDB
             info = Media().get_tmdb_info(tmdbid=mediaid,
@@ -121,10 +121,7 @@ class WebUtils:
                 return None
             media_info = MetaInfo(title=info.get("title") if mtype == MediaType.MOVIE else info.get("name"))
             media_info.set_tmdb_info(info)
-        if info.get("rating"):
-            media_info.vote_average = info.get("rating").get("value")
-        else:
-            media_info.vote_average = None
+
         return media_info
 
     @staticmethod
@@ -199,7 +196,10 @@ class WebUtils:
         """
         带缓存的请求
         """
-        ret = RequestUtils().get_res(url)
+        if url.find('douban'):
+            ret = RequestUtils(referer="https://movie.douban.com").get_res(url)
+        else:
+            ret = RequestUtils().get_res(url)
         if ret:
             return ret.content
         return None
