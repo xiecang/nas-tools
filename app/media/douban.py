@@ -11,6 +11,7 @@ from app.utils import ExceptionUtils, StringUtils
 from app.utils import RequestUtils
 from app.utils.commons import singleton
 from app.utils.types import MediaType
+from config import Config
 
 lock = Lock()
 
@@ -23,6 +24,7 @@ class DouBan:
     message = None
     _movie_num = 20
     _tv_num = 20
+    userid = None
 
     def __init__(self):
         self.init_config()
@@ -30,13 +32,10 @@ class DouBan:
     def init_config(self):
         self.doubanapi = DoubanApi()
         self.doubanweb = DoubanWeb()
-        try:
-            res = RequestUtils(timeout=5).get_res("https://www.douban.com/")
-            if res:
-                self.cookie = StringUtils.str_from_cookiejar(res.cookies)
-        except Exception as err:
-            ExceptionUtils.exception_traceback(err)
-            log.warn(f"【Douban】获取cookie失败：{format(err)}")
+        douban = Config().get_config('douban')
+        if douban:
+            self.userid = douban.get('user')
+            self.cookie = douban.get('cookie')
 
     def get_douban_detail(self, doubanid, mtype=None, wait=False):
         """
@@ -50,12 +49,12 @@ class DouBan:
             sleep(time)
         if mtype == MediaType.MOVIE:
             douban_info = self.doubanapi.movie_detail(doubanid)
-        elif mtype:
-            douban_info = self.doubanapi.tv_detail(doubanid)
-        else:
-            douban_info = self.doubanapi.movie_detail(doubanid)
             if not douban_info:
                 douban_info = self.doubanapi.tv_detail(doubanid)
+        else:
+            douban_info = self.doubanapi.tv_detail(doubanid)
+            if not douban_info:
+                douban_info = self.doubanapi.movie_detail(doubanid)
         if not douban_info:
             log.warn("【Douban】%s 未找到豆瓣详细信息" % doubanid)
             return None
@@ -128,7 +127,8 @@ class DouBan:
                 douban_info["actors"] = celebrities.get("actors")
             return douban_info
 
-    def get_douban_wish(self, dtype, userid, start, wait=False):
+    def get_douban_wish(self, dtype, start, wait=False):
+        userid = self.userid
         """
         获取豆瓣想看列表数据
         """
@@ -148,7 +148,8 @@ class DouBan:
             web_info["id"] = web_info.get("url").split("/")[-2]
         return web_infos
 
-    def get_user_info(self, userid, wait=False):
+    def get_user_info(self, wait=False):
+        userid = self.userid
         if wait:
             time = round(random.uniform(1, 5), 1)
             log.info("【Douban】随机休眠：%s 秒" % time)

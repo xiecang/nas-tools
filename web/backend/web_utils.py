@@ -95,6 +95,7 @@ class WebUtils:
                 media_info = Media().get_media_info(title=f"{title} {year}",
                                                     mtype=mtype,
                                                     append_to_response="all")
+
             media_info.douban_id = doubanid
         elif str(mediaid).startswith("BG:"):
             # BANGUMI
@@ -121,7 +122,6 @@ class WebUtils:
                 return None
             media_info = MetaInfo(title=info.get("title") if mtype == MediaType.MOVIE else info.get("name"))
             media_info.set_tmdb_info(info)
-
         return media_info
 
     @staticmethod

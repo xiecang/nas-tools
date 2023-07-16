@@ -1815,3 +1815,11 @@ def str_filesize(size):
 @App.template_filter('hash')
 def md5_hash(text):
     return StringUtils.md5_hash(text)
+
+
+# 豆瓣页面
+@App.route('/douban', methods=['POST', 'GET'])
+@login_required
+def douban():
+    return render_template("setting/douban.html",
+                           Config=Config().get_config())

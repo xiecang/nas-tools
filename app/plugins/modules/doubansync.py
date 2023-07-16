@@ -567,7 +567,7 @@ class DoubanSync(_IPluginModule):
                 continue
             # 查询用户名称
             user_name = ""
-            userinfo = self.douban.get_user_info(userid=user)
+            userinfo = self.douban.get_user_info()
             if userinfo:
                 user_name = userinfo.get("name")
             # 每一个类型成功数量
@@ -590,7 +590,7 @@ class DoubanSync(_IPluginModule):
                     continue_next_page = True
                     self.debug(f"开始解析第 {page_number} 页数据...")
                     try:
-                        items = self.douban.get_douban_wish(dtype=mtype, userid=user, start=start_number, wait=True)
+                        items = self.douban.get_douban_wish(dtype=mtype, start=start_number, wait=True)
                         if not items:
                             self.warn(f"第 {page_number} 页未获取到数据")
                             break

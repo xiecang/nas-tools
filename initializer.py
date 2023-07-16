@@ -234,9 +234,6 @@ def update_config():
                 "days": douban.get("days"),
                 "types": douban.get("types")
             })
-            # 删除旧配置
-            _config.pop("douban")
-            overwrite_cofig = True
     except Exception as e:
         ExceptionUtils.exception_traceback(e)
 
