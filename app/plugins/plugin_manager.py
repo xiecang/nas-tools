@@ -218,7 +218,7 @@ class PluginManager:
             return ImageUtils.calculate_theme_color(icon_path)
         return ""
 
-    def get_plugins_conf(self, auth_level):
+    def get_plugins_conf(self):
         """
         获取所有插件配置
         """
@@ -226,10 +226,6 @@ class PluginManager:
         for pid, plugin in self._running_plugins.items():
             # 基本属性
             conf = {}
-            # 权限
-            if hasattr(plugin, "auth_level") \
-                    and plugin.auth_level > auth_level:
-                continue
             # 名称
             if hasattr(plugin, "module_name"):
                 conf.update({"name": plugin.module_name})
@@ -264,7 +260,7 @@ class PluginManager:
             all_confs[pid] = conf
         return all_confs
 
-    def get_plugin_apps(self, auth_level):
+    def get_plugin_apps(self):
         """
         获取所有插件
         """
@@ -273,10 +269,6 @@ class PluginManager:
         for pid, plugin in self._plugins.items():
             # 基本属性
             conf = {}
-            # 权限
-            if hasattr(plugin, "auth_level") \
-                    and plugin.auth_level > auth_level:
-                continue
             # ID
             conf.update({"id": pid})
             # 安装状态

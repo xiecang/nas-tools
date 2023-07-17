@@ -235,7 +235,6 @@ def web():
     Indexers = Indexer().get_indexers()
     SearchSource = "douban" if Config().get_config("laboratory").get("use_douban_titles") else "tmdb"
     CustomScriptCfg = SystemConfig().get(SystemConfigKey.CustomScript)
-    CooperationSites = current_user.get_authsites()
     Menus = WebAction().get_user_menus().get("menus") or []
     Commands = WebAction().get_commands()
     return render_template('navigation.html',
@@ -252,7 +251,6 @@ def web():
                            Indexers=Indexers,
                            SearchSource=SearchSource,
                            CustomScriptCfg=CustomScriptCfg,
-                           CooperationSites=CooperationSites,
                            DefaultPath=DefaultPath,
                            Menus=Menus,
                            Commands=Commands)

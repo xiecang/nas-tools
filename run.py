@@ -1,3 +1,4 @@
+
 import os
 import signal
 import sys
@@ -23,16 +24,14 @@ if is_executable:
             os.makedirs(config_path)
     except Exception as err:
         print(str(err))
-
-from config import Config
-import log
-from web.action import WebAction
-from web.main import App
-from app.db import init_db, update_db, init_data
-from app.helper import init_chrome
 from initializer import update_config, check_config,  start_config_monitor, stop_config_monitor
+from app.helper import init_chrome
+from app.db import init_db, update_db, init_data
+from web.main import App
+from web.action import WebAction
+import log
+from config import Config
 from version import APP_VERSION
-
 
 def sigal_handler(num, stack):
     """
@@ -106,8 +105,6 @@ def start_service():
     log.console("开始启动服务...")
     # 启动服务
     WebAction.start_service()
-    # 用户认证
-    WebAction.auth_user_level()
     # 监听配置文件变化
     start_config_monitor()
 

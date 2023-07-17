@@ -46,7 +46,6 @@ from app.utils.types import RmtMode, OsType, SearchType, SyncType, MediaType, Mo
     EventType, SystemConfigKey, RssType
 from config import RMT_MEDIAEXT, RMT_SUBEXT, RMT_AUDIO_TRACK_EXT, Config
 from web.backend.search_torrents import search_medias_for_web, search_media_by_message
-from web.backend.user import User
 from web.backend.web_utils import WebUtils
 
 
@@ -464,7 +463,6 @@ class WebAction:
             "get_season_episodes": self.__get_season_episodes,
             "get_user_menus": self.get_user_menus,
             "get_top_menus": self.get_top_menus,
-            "auth_user_level": self.auth_user_level,
             "update_downloader": self.__update_downloader,
             "del_downloader": self.__del_downloader,
             "check_downloader": self.__check_downloader,
@@ -1931,9 +1929,9 @@ class WebAction:
             pris = data.get("pris")
             if isinstance(pris, list):
                 pris = ",".join(pris)
-            ret = User().add_user(name, password, pris)
+            ret = DbHelper().insert_user(name, password, pris)
         else:
-            ret = User().delete_user(name)
+            ret = DbHelper().delete_user(name)
 
         if ret == 1 or ret:
             return {"code": 0, "success": False}
@@ -4204,7 +4202,7 @@ class WebAction:
         """
         查询所有用户
         """
-        user_list = User().get_users()
+        user_list = DbHelper().get_users()
         Users = []
         for user in user_list:
             pris = str(user.PRIS).split(",")
@@ -5027,7 +5025,6 @@ class WebAction:
         return {
             "code": 0,
             "menus": WebAction.user_menu,
-            "level": current_user.level
         }
 
     @staticmethod
@@ -5037,34 +5034,8 @@ class WebAction:
         """
         return {
             "code": 0,
-            "menus": current_user.get_topmenus()
+            "menus": ['我的媒体库', '探索', '资源搜索', '站点管理', '订阅管理', '下载管理', '媒体整理', '服务', '系统设置'],
         }
-
-    @ staticmethod
-    def auth_user_level(data=None):
-        """
-        用户认证
-        """
-        if data:
-            site = data.get("site")
-            params = data.get("params")
-        else:
-            UserSiteAuthParams = SystemConfig().get(SystemConfigKey.UserSiteAuthParams)
-            if UserSiteAuthParams:
-                site = UserSiteAuthParams.get("site")
-                params = UserSiteAuthParams.get("params")
-            else:
-                return {"code": 1, "msg": "参数错误"}
-        state, msg = User().check_user(site, params)
-        if state:
-            # 保存认证数据
-            SystemConfig().set(key=SystemConfigKey.UserSiteAuthParams,
-                               value={
-                                   "site": site,
-                                   "params": params
-                               })
-            return {"code": 0, "msg": "认证成功"}
-        return {"code": 1, "msg": f"{msg or '认证失败，请检查合作站点账号是否正常！'}"}
 
     @staticmethod
     def __update_downloader(data):
@@ -5302,7 +5273,7 @@ class WebAction:
         """
         获取插件列表
         """
-        plugins = PluginManager().get_plugin_apps(current_user.level)
+        plugins = PluginManager().get_plugin_apps()
         statistic = PluginHelper.statistic()
         return {"code": 0, "result": plugins, "statistic": statistic}
 
@@ -5330,7 +5301,7 @@ class WebAction:
 
     @staticmethod
     def get_plugins_conf():
-        Plugins = PluginManager().get_plugins_conf(current_user.level)
+        Plugins = PluginManager().get_plugins_conf()
         return {"code": 0, "result": Plugins}
 
     @staticmethod

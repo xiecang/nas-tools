@@ -363,23 +363,6 @@ function show_user_auth_modal() {
   $("#modal-user-auth").modal("show");
 }
 
-// 用户认证
-function user_auth() {
-  $("#user_auth_btn").text("认证中...").prop("disabled", true);
-  let siteid = $("#user_auth_site").val();
-  let params = input_select_GetVal(`user_auth_${siteid}_params`, `${siteid}_`);
-  ajax_post("auth_user_level", {site: siteid, params: params}, function (ret) {
-    GlobalModalAbort = true;
-    $("#modal-user-auth").modal("hide");
-    $("#user_auth_btn").prop("disabled", false).text("认证");
-    if (ret.code === 0) {
-      window.location.reload();
-    } else {
-      show_fail_modal(ret.msg);
-    }
-  }, true, false);
-}
-
 // 初始化tomselect
 function init_tomselect() {
   let el;
