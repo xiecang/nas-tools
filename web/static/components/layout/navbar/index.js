@@ -7,7 +7,7 @@ export class LayoutNavbar extends CustomElement {
     navbar_list: {type: Array },
     layout_gopage: { attribute: "layout-gopage" },
     layout_appversion: { attribute: "layout-appversion"},
-    layout_useradmin: { attribute: "layout-useradmin"},
+    layout_userpris: { attribute: "layout-userpris" },
     _active_name: { state: true},
     _update_appversion: { state: true },
     _update_url: { state: true },
@@ -19,6 +19,8 @@ export class LayoutNavbar extends CustomElement {
     this.navbar_list = [];
     this.layout_gopage = "";
     this.layout_appversion = "v3.0.0";
+    this.layout_userpris = [];
+
     this._active_name = "";
     this._update_appversion = "";
     this._update_url = "https://github.com/120318/nas-tools";
@@ -154,7 +156,7 @@ export class LayoutNavbar extends CustomElement {
                 ))}
               </div>
               <div class="d-flex align-items-end">
-                ${this.layout_useradmin === "1" ? html`
+              ${this.layout_userpris.includes("系统设置") ? html`
                   <!-- 升级提示 -->
                   <span class="d-flex flex-grow-1 justify-content-center border rounded-3 m-3 p-2 ${this._is_update ? "bg-yellow" : ""}">
                     <a href=${this._update_url} class="${this._is_update ? "text-yellow-fg" : "text-muted"}" target="_blank" rel="noreferrer">

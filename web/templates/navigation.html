@@ -84,7 +84,7 @@
   <!-- 解决密码填充问题 -->
   <span hidden><input type="text" aria-label=""><input type="password" aria-label=""></span>
   <layout-navbar id="navbar-menu" hidden
-    layout-useradmin="{{ CurrentUser.admin }}"
+    layout-userpris = "{{ CurrentUser.pris }}"
     layout-gopage="{{ GoPage }}"
     layout-appversion="{{ AppVersion }}"
     >
@@ -92,7 +92,7 @@
   <layout-searchbar hidden
       layout-username="{{ CurrentUser.name }}"
       layout-systemflag="{{ SystemFlag }}"
-      layout-useradmin="{{ CurrentUser.admin }}"
+      layout-userpris = "{{ CurrentUser.pris }}"
       layout-search="{{ CurrentUser.search }}"
       >
   </layout-searchbar>

@@ -37,7 +37,7 @@ export class LayoutSearchbar extends CustomElement {
     layout_systemflag: { attribute: "layout-systemflag" },
     layout_username: { attribute: "layout-username" },
     layout_search: { attribute: "layout-search"},
-    layout_useradmin: { attribute: "layout-useradmin" },
+    layout_userpris: { attribute: "layout-userpris"},
     layout_search_source: { attribute: "layout-search-source" },
     _search_source: { state: true },
   };
@@ -46,6 +46,7 @@ export class LayoutSearchbar extends CustomElement {
     super();
     this.layout_systemflag = "Docker";
     this.layout_username = "admin";
+    this.layout_userpris = [];
     this.layout_search_source = "tmdb";
     this._search_source = "tmdb";
     this.classList.add("navbar", "fixed-top", "lit-searchbar");
@@ -147,8 +148,7 @@ export class LayoutSearchbar extends CustomElement {
                 <a class="dropdown-item hide-theme-dark" href="?theme=dark" role="button">暗黑风格</a>
                 <a class="dropdown-item hide-theme-light" href="?theme=light" role="button">明亮风格</a>
                 <div class="dropdown-divider"></div>
-                ${this.layout_useradmin === "1"
-                ? html`
+                ${this.layout_userpris.includes("系统设置") ? html`
                     <a class="dropdown-item" data-bs-toggle="offcanvas" href="#offcanvasEnd" role="button"
                       aria-controls="offcanvasEnd">消息中心</a>
                     <a class="dropdown-item" href="javascript:show_logging_modal()" role="button">实时日志</a>
@@ -158,8 +158,7 @@ export class LayoutSearchbar extends CustomElement {
                       <a href="javascript:restart()" class="dropdown-item">重启</a>
                       <a href="javascript:update()" class="dropdown-item">更新</a>`
                     : nothing }
-                  `
-                : nothing }
+                  `: nothing }
                 <a href="javascript:logout()" class="dropdown-item">
                   注销 <span class="text-muted mx-3">${this.layout_username}</span>
                 </a>
@@ -169,8 +168,6 @@ export class LayoutSearchbar extends CustomElement {
       </div>
     `;
   }
-
 }
-
 
 window.customElements.define("layout-searchbar", LayoutSearchbar);
