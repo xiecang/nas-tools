@@ -952,14 +952,12 @@ def indexer():
     indexers = Indexer().get_indexers(check=False)
     private_count = len([item.id for item in indexers if not item.public])
     public_count = len([item.id for item in indexers if item.public])
-    indexer_sites = SystemConfig().get(SystemConfigKey.UserIndexerSites)
     return render_template("setting/indexer.html",
                            Config=Config().get_config(),
                            PrivateCount=private_count,
                            PublicCount=public_count,
                            Indexers=indexers,
-                           IndexerConf=ModuleConf.INDEXER_CONF,
-                           IndexerSites=indexer_sites)
+                           IndexerConf=ModuleConf.INDEXER_CONF)
 
 
 # 媒体库页面
