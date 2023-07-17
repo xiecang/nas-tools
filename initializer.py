@@ -259,17 +259,6 @@ def update_config():
     except Exception as e:
         ExceptionUtils.exception_traceback(e)
 
-    # 内建索引器配置改为存数据库
-    try:
-        indexer_sites = Config().get_config("pt").get("indexer_sites")
-        if indexer_sites:
-            SystemConfig().set(SystemConfigKey.UserIndexerSites,
-                               indexer_sites)
-            _config['pt'].pop("indexer_sites")
-            overwrite_cofig = True
-    except Exception as e:
-        ExceptionUtils.exception_traceback(e)
-
     # 站点签到转为插件
     try:
         ptsignin_cron = Config().get_config("pt").get("ptsignin_cron")

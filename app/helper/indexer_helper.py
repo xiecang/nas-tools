@@ -62,7 +62,6 @@ class IndexerHelper:
                                    parser=parser,
                                    ua=ua,
                                    render=render,
-                                   builtin=True,
                                    language=language,
                                    pri=pri)
         return None
@@ -81,7 +80,6 @@ class IndexerConf(object):
                  parser=None,
                  ua=None,
                  render=None,
-                 builtin=True,
                  language=None,
                  pri=None):
         if not datas:
@@ -90,14 +88,12 @@ class IndexerConf(object):
         self.id = datas.get('id')
         # 名称
         self.name = name if name else datas.get('name')
-        # 是否内置站点
-        self.builtin = builtin
         # 域名
         self.domain = datas.get('domain')
         # 搜索
         self.search = datas.get('search', {})
         # 批量搜索，如果为空对象则表示不支持批量搜索
-        self.batch = self.search.get("batch", {}) if builtin else {}
+        self.batch = {}
         # 解析器
         self.parser = parser if parser is not None else datas.get('parser')
         # 是否启用渲染

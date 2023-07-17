@@ -46,7 +46,6 @@ class ModuleConf(object):
     INDEXER_DICT = {
         "prowlarr": IndexerType.PROWLARR,
         "jackett": IndexerType.JACKETT,
-        "builtin": IndexerType.BUILTIN
     }
     # 远程转移模式
     REMOTE_RMT_MODES = [RmtMode.RCLONE, RmtMode.RCLONECOPY, RmtMode.MINIO, RmtMode.MINIOCOPY]

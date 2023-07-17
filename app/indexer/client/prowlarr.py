@@ -62,8 +62,7 @@ class Prowlarr(_IIndexClient):
         indexers = ret.json().get("indexers", [])
         return [IndexerConf({"id": v["indexerId"],
                              "name": v["indexerName"],
-                             "domain": f'{self.host}{v["indexerId"]}/api',
-                             "builtin": False})
+                             "domain": f'{self.host}{v["indexerId"]}/api'})
                 for v in indexers]
 
     def search(self, *kwargs):
