@@ -49,6 +49,9 @@ from web.backend.user import User
 from web.backend.wallpaper import get_login_wallpaper
 from web.backend.web_utils import WebUtils
 from web.security import require_auth
+from pathlib import Path
+import secrets
+
 
 # 配置文件锁
 ConfigLock = Lock()
@@ -59,7 +62,17 @@ App.wsgi_app = ProxyFix(App.wsgi_app)
 App.config['JSON_AS_ASCII'] = False
 App.config['JSON_SORT_KEYS'] = False
 App.config['SOCK_SERVER_OPTIONS'] = {'ping_interval': 25}
-App.secret_key = os.urandom(24)
+
+SECRET_FILE_PATH = Path(os.path.join(Config().get_inner_config_path(), ".flask_secret"))
+try:
+    with SECRET_FILE_PATH.open("r") as secret_file:
+        App.secret_key = secret_file.read()
+except FileNotFoundError:
+    # Let's create a cryptographically secure code in that file
+    with SECRET_FILE_PATH.open("w") as secret_file:
+        App.secret_key = secrets.token_hex(32)
+        secret_file.write(App.secret_key)
+
 App.permanent_session_lifetime = datetime.timedelta(days=30)
 
 # Flask Socket
