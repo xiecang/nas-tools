@@ -93,7 +93,6 @@
       layout-username="{{ CurrentUser.username }}"
       layout-systemflag="{{ SystemFlag }}"
       layout-userpris = "{{ CurrentUser.pris }}"
-      layout-search="{{ CurrentUser.search }}"
       >
   </layout-searchbar>
   <div class="spinner-border" role="status" id="logo_animation"></div>
@@ -1156,10 +1155,7 @@
     DefaultTransferMode = '{{ SyncMod }}';
     DefaultPath = "{{ DefaultPath }}";
 
-    // TomSelect下拉框
-    init_tomselect();
-
-    // Dropzone配置
+     // Dropzone配置
     init_dropzone();
 
     // WebSocket刷新消息中心
