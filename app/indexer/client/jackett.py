@@ -57,13 +57,13 @@ class Jackett(_IIndexClient):
         """
         # 获取Cookie
         cookie = None
-        session = requests.session()
-        res = RequestUtils(session=session).post_res(url=f"{self.host}UI/Dashboard",
-                                                     params={"password": self._password})
-        if res and session.cookies:
-            cookie = session.cookies.get_dict()
-        indexer_query_url = f"{self.host}api/v2.0/indexers?configured=true"
         try:
+            session = requests.session()
+            res = RequestUtils(session=session).post_res(url=f"{self.host}UI/Dashboard",
+                                                        params={"password": self._password})
+            if res and session.cookies:
+                cookie = session.cookies.get_dict()
+            indexer_query_url = f"{self.host}api/v2.0/indexers?configured=true"
             ret = RequestUtils(cookies=cookie).get_res(indexer_query_url)
             if not ret or not ret.json():
                 return []
